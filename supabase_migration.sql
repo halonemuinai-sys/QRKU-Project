@@ -8,6 +8,7 @@ drop table if exists barcode.dynamic_links cascade;
 create table barcode.dynamic_links (
   id uuid default gen_random_uuid() primary key,
   short_id text unique not null,
+  user_id uuid, -- references auth.users(id) - links QR to its creator
   
   -- Data QR (General)
   type text default 'vcard', -- 'vcard', 'link', 'wifi', 'maps'
@@ -53,8 +54,17 @@ create policy "Allow anon insert dynamic_links"
 on barcode.dynamic_links for insert 
 with check (true);
 
+create policy "Allow anon update dynamic_links" 
+on barcode.dynamic_links for update 
+using (true);
+
+create policy "Allow anon delete dynamic_links" 
+on barcode.dynamic_links for delete 
+using (true);
+
 -- 5. Indexing
 create index idx_barcode_short_id on barcode.dynamic_links(short_id);
+create index idx_barcode_user_id on barcode.dynamic_links(user_id);
 
 -- 6. Grant Permissions (PENTING untuk Schema Baru)
 grant usage on schema barcode to anon, authenticated;
@@ -67,7 +77,13 @@ create table barcode.scan_logs (
   link_id uuid references barcode.dynamic_links(id) on delete cascade,
   scanned_at timestamp with time zone default timezone('utc'::text, now()) not null,
   user_agent text,
-  ip_address text
+  ip_address text,
+  city text,
+  country text,
+  lat float8,
+  lon float8,
+  os text,
+  browser text
 );
 
 alter table barcode.scan_logs enable row level security;

@@ -1,10 +1,13 @@
+/* eslint-disable react/forbid-dom-props */
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
+import { motion, AnimatePresence, Variants } from "framer-motion";
 import axios from "axios";
 import confetti from "canvas-confetti";
 import dynamic from "next/dynamic";
+import { useAuth } from "@/context/AuthContext";
 import { 
   QrCode, 
   User, 
@@ -39,41 +42,54 @@ import {
   Edit3,
   MessageSquare,
   Camera,
-  Play
+  Play,
+  Smartphone,
+  LogOut
 } from "lucide-react";
 
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+  PieChart, Pie
 } from "recharts";
 
-// Dynamic import for Leaflet
-const MapContainer = dynamic(() => import("react-leaflet").then((mod) => mod.MapContainer), { ssr: false });
-const TileLayer = dynamic(() => import("react-leaflet").then((mod) => mod.TileLayer), { ssr: false });
-const Marker = dynamic(() => import("react-leaflet").then((mod) => mod.Marker), { ssr: false });
-const useMapEvents = dynamic(() => import("react-leaflet").then((mod) => mod.useMapEvents), { ssr: false });
+// Dynamic import for Leaflet (must disable SSR since Leaflet needs 'window')
+const MapWrapper = dynamic(() => import("./MapWrapper"), { ssr: false, loading: () => <div className="w-full h-full bg-gray-100 flex items-center justify-center font-bold">Loading Map...</div> });
+const AnalyticsMap = dynamic(() => import("./AnalyticsMap"), { ssr: false });
 
-import "leaflet/dist/leaflet.css";
-
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
-} as const;
+};
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { y: 30, opacity: 0, scale: 0.9 },
   visible: { y: 0, opacity: 1, scale: 1, transition: { type: "spring", damping: 12, stiffness: 100 } }
-} as const;
+};
 
-const floatingVariants = {
+const floatingVariants: Variants = {
   animate: {
     y: [0, -20, 0],
     rotate: [0, 10, -10, 0],
     transition: { duration: 5, repeat: Infinity, ease: "easeInOut" }
   }
-} as const;
+};
 
 
 export default function Home() {
+  const { user, loading: authLoading, signOut } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/auth");
+    }
+  }, [user, authLoading, router]);
+
+  // Create axios instance with user_id header
+  const api = axios.create({
+    baseURL: "",
+    headers: user ? { "x-user-id": user.id } : {},
+  });
   const [formData, setFormData] = useState({
     firstName: "Aris",
     lastName: "Setiyono",
@@ -128,9 +144,9 @@ export default function Home() {
     { name: 'LinkedIn', url: 'https://cdn.simpleicons.org/linkedin/0A66C2' },
     { name: 'YouTube', url: 'https://cdn.simpleicons.org/youtube/FF0000' },
     { name: 'Google', url: 'https://cdn.simpleicons.org/google/4285F4' },
-    { name: 'Bvlgari', url: 'http://localhost:3001/uploads/bvlgari.png' },
-    { name: 'Omega', url: 'http://localhost:3001/uploads/omega.png' },
-    { name: 'Cartier', url: 'http://localhost:3001/uploads/cartier.png' },
+    { name: 'Bvlgari', url: '/uploads/bvlgari.png' },
+    { name: 'Omega', url: '/uploads/omega.png' },
+    { name: 'Cartier', url: '/uploads/cartier.png' },
   ];
 
   const [activeTab, setActiveTab] = useState<"qr" | "vcard" | "smart" | "analytics" | "gallery">("qr");
@@ -145,25 +161,44 @@ export default function Home() {
 
   const fetchAnalytics = async () => {
     try {
-      const response = await axios.get("http://localhost:3001/analytics");
+      const response = await api.get("/api/analytics");
       setAnalyticsData(response.data);
     } catch (error) { console.error(error); }
   };
 
   const fetchGallery = async () => {
     try {
-      const response = await axios.get("http://localhost:3001/gallery");
+      const response = await api.get("/api/gallery");
       setGalleryData(response.data);
     } catch (error) { console.error(error); }
   };
 
   const deleteQR = async (id: string) => {
-    if (!confirm("Yakin mau hapus QR ini?")) return;
+    const confirmed = window.confirm("Yakin mau hapus QR ini?");
+    if (!confirmed) return;
     try {
-      await axios.delete(`http://localhost:3001/gallery/${id}`);
-      fetchGallery();
+      await api.delete(`/api/gallery/${id}`);
+      setGalleryData(prev => prev.filter(item => item.id !== id));
       triggerConfetti();
-    } catch (error) { console.error(error); }
+    } catch (error: any) {
+      console.error("Delete error:", error);
+      alert("Gagal menghapus: " + (error?.response?.data?.error || error.message));
+    }
+  };
+
+  const deleteAllQRs = async () => {
+    if (galleryData.length === 0) return;
+    if (!window.confirm("⚠️ BAHAYA! Anda akan menghapus SELURUH gallery. Yakin?")) return;
+    if (!window.confirm("Ketik 'SAYA YAKIN' pun tidak perlu, tapi ini peringatan terakhir. Hapus semua?")) return;
+    
+    try {
+      await api.delete("/api/gallery");
+      setGalleryData([]);
+      triggerConfetti();
+    } catch (error: any) {
+      console.error("Delete all error:", error);
+      alert("Gagal menghapus semua: " + (error?.response?.data?.error || error.message));
+    }
   };
 
   const restoreQR = (item: any) => {
@@ -233,9 +268,9 @@ export default function Home() {
   const generateQR = async () => {
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:3001/generate", {
+      const response = await fetch("/api/generate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-user-id": user?.id || "" },
         body: JSON.stringify(formData),
       });
       
@@ -289,9 +324,9 @@ export default function Home() {
         rawData = { ttUsername: smartData.ttUsername };
       }
       
-      const response = await fetch("http://localhost:3001/generate-basic", {
+      const response = await fetch("/api/generate-basic", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-user-id": user?.id || "" },
         body: JSON.stringify({
           data: finalData,
           type: smartData.type,
@@ -329,7 +364,7 @@ export default function Home() {
     const uploadData = new FormData();
     uploadData.append("logo", file);
     try {
-      const response = await axios.post("http://localhost:3001/upload", uploadData);
+      const response = await api.post("/api/upload", uploadData);
       setFormData({ ...formData, logoUrl: response.data.url });
       triggerConfetti();
     } catch (error) { console.error(error); } finally { setUploading(false); }
@@ -358,6 +393,18 @@ export default function Home() {
     setSmartData({ ...smartData, [e.target.name]: e.target.value });
   };
 
+  if (authLoading || !user) {
+    return (
+      <div className="min-h-screen bg-[#fffbef] flex items-center justify-center">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          className="w-16 h-16 border-[5px] border-black border-t-[#ffeb3b] rounded-full"
+        />
+      </div>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[#fffbef] p-4 md:p-10 font-sans selection:bg-yellow-300 relative overflow-hidden">
       <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-50">
@@ -372,7 +419,15 @@ export default function Home() {
             <div className="p-4 bg-[#ffeb3b] border-2 border-black shadow-[4px_4px_0px_0px_#000] rounded-2xl"><QrCode size={36}/></div>
             <div><h1 className="text-4xl font-[900] tracking-tight text-black">BIKIN<span className="text-[#2196f3]">QR</span></h1><p className="text-sm font-bold uppercase tracking-widest text-gray-500">Bikin QR Jadi Seru! ✨</p></div>
           </div>
-          <div className="flex gap-4">{['#f44336', '#2196f3', '#ffeb3b'].map(c => <div key={c} className="w-12 h-12 rounded-full border-[3px] border-black shadow-[4px_4px_0px_0px_#000]" style={{ backgroundColor: c }} />)}</div>
+          <div className="flex items-center gap-4">
+            <div className="hidden md:block text-right">
+              <p className="text-xs font-black uppercase text-gray-400">Logged in as</p>
+              <p className="text-sm font-bold truncate max-w-[200px]">{user?.email}</p>
+            </div>
+            <button onClick={signOut} title="Logout" className="p-3 bg-red-100 border-2 border-black rounded-xl hover:bg-red-200 transition-all shadow-[3px_3px_0px_0px_#000] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px]">
+              <LogOut size={20} />
+            </button>
+          </div>
         </header>
 
         <nav className="flex flex-wrap gap-4 mb-10">
@@ -461,30 +516,86 @@ export default function Home() {
                   <h3 className="text-2xl font-black uppercase italic mb-8 flex items-center gap-3"><Star /> Top vCards</h3>
                   <div className="space-y-6">{analyticsData?.topCards?.map((card: any, i: number) => (<div key={i} className="flex items-center justify-between p-4 bg-gray-50 border-2 border-black rounded-2xl shadow-[4px_4px_0px_0px_#000]"><div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center font-bold text-xs">{i+1}</div><span className="font-bold">{card.first_name}</span></div><span className="font-black text-[#2196f3]">{card.scan_count} Scans</span></div>))}</div>
                 </div>
+
+                {/* Map View */}
+                <div className="lg:col-span-8 bg-white border-[4px] border-black shadow-[10px_10px_0px_0px_#000] rounded-[2.5rem] p-10">
+                  <h3 className="text-2xl font-black uppercase italic mb-8 flex items-center gap-3"><Globe /> Lokasi Scan (Peta)</h3>
+                  <div className="h-[400px] w-full border-2 border-black rounded-2xl overflow-hidden">
+                    {analyticsData?.mapMarkers ? <AnalyticsMap markers={analyticsData.mapMarkers} /> : <div className="h-full flex items-center justify-center font-bold text-gray-300 italic">Memuat peta...</div>}
+                  </div>
+                </div>
+
+                {/* Device Insights */}
+                <div className="lg:col-span-4 bg-white border-[4px] border-black shadow-[10px_10px_0px_0px_#000] rounded-[2.5rem] p-10">
+                  <h3 className="text-2xl font-black uppercase italic mb-8 flex items-center gap-3"><Smartphone /> Device Insights</h3>
+                  <div className="h-[300px] w-full flex flex-col items-center justify-center">
+                    {analyticsData?.osDistribution && analyticsData.osDistribution.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={analyticsData.osDistribution}
+                            cx="50%" cy="50%"
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={5}
+                            dataKey="value"
+                            stroke="#000"
+                            strokeWidth={2}
+                          >
+                            {analyticsData.osDistribution.map((entry: any, index: number) => (
+                              <Cell key={`cell-${index}`} fill={['#ffeb3b', '#2196f3', '#f44336', '#4caf50'][index % 4]} />
+                            ))}
+                          </Pie>
+                          <Tooltip contentStyle={{ borderRadius: '1rem', border: '3px solid black', boxShadow: '4px 4px 0px 0px black' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : <div className="text-gray-300 font-bold">Belum ada data device...</div>}
+                    <div className="mt-4 flex flex-wrap justify-center gap-4">
+                      {analyticsData?.osDistribution?.map((os: any, i: number) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full border-2 border-black" style={{ backgroundColor: ['#ffeb3b', '#2196f3', '#f44336', '#4caf50'][i % 4] }}></div>
+                          <span className="text-xs font-black uppercase italic">{os.name} ({os.value})</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
             </motion.div>
           ) : activeTab === "gallery" ? (
-            <motion.div key="gallery-tab" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {galleryData.length > 0 ? galleryData.map((item) => (
+            <motion.div key="gallery-tab" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
+              <div className="flex justify-between items-center bg-white border-[4px] border-black rounded-[2rem] p-6 shadow-[8px_8px_0px_0px_#000]">
+                <div>
+                  <h3 className="text-2xl font-black uppercase italic flex items-center gap-3"><History /> Riwayat QR</h3>
+                  <p className="text-xs font-bold text-gray-400 uppercase">Total {galleryData.length} QR tersimpan</p>
+                </div>
+                {galleryData.length > 0 && (
+                  <button onClick={deleteAllQRs} className="bg-red-500 text-white border-[3px] border-black px-6 py-3 rounded-2xl font-black uppercase italic text-sm shadow-[4px_4px_0px_0px_#000] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all flex items-center gap-2" title="Hapus Semua QR">
+                    <Trash2 size={18} /> Delete All
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {galleryData.length > 0 ? galleryData.map((item) => (
                 <motion.div whileHover={{ scale: 1.02 }} key={item.id} className="bg-white border-[4px] border-black rounded-[2.5rem] shadow-[8px_8px_0px_0px_#000] p-8 flex flex-col justify-between">
                   <div>
                     <div className="flex justify-between items-start mb-4">
                       <div className={`px-4 py-1 rounded-full border-2 border-black font-black text-xs uppercase ${item.type === 'vcard' ? 'bg-[#ffeb3b]' : 'bg-[#4caf50] text-white'}`}>{item.type || 'UNKNOWN'}</div>
                       <div className="flex gap-2">
-                        <button onClick={() => restoreQR(item)} className="p-2 border-2 border-black rounded-lg bg-blue-100 hover:bg-blue-200" title="Edit"><Edit3 size={18}/></button>
-                        <button onClick={() => deleteQR(item.id)} className="p-2 border-2 border-black rounded-lg bg-red-100 hover:bg-red-200" title="Hapus"><Trash2 size={18}/></button>
+                        <button onClick={() => restoreQR(item)} className="p-2 border-2 border-black rounded-lg bg-blue-100 hover:bg-blue-200" title="Edit Data QR"><Edit3 size={18}/></button>
+                        <button onClick={() => deleteQR(item.id)} className="p-2 border-2 border-black rounded-lg bg-red-100 hover:bg-red-200" title="Hapus QR dari Galeri"><Trash2 size={18}/></button>
                       </div>
                     </div>
                     <h3 className="text-xl font-black uppercase mb-1">{item.type === 'vcard' ? `${item.first_name} ${item.last_name || ''}` : String(item.type || 'UNKNOWN').toUpperCase()}</h3>
                     <p className="text-xs font-bold text-gray-500 italic mb-4">{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
 
-                    <div className="bg-gray-50 border-2 border-black rounded-2xl p-4 flex items-center justify-center aspect-square mb-6">
+                    <div className="bg-gray-50 border-2 border-black rounded-2xl p-4 flex items-center justify-center aspect-square mb-6 relative">
                       <QrCode size={120} className="opacity-20" />
                       <div className="absolute font-black text-xs uppercase opacity-30 tracking-widest">Preview QR</div>
                     </div>
                   </div>
                   <div className="flex gap-3">
-                    <button onClick={() => { setActiveTab(item.type === 'vcard' ? 'qr' : 'smart'); restoreQR(item); }} className="flex-1 bg-[#ffeb3b] border-2 border-black py-2 rounded-xl font-black text-sm shadow-[4px_4px_0px_0px_#000] hover:shadow-none translate-x-0 hover:translate-x-[2px] hover:translate-y-[2px] transition-all flex items-center justify-center gap-2">
+                    <button onClick={() => { setActiveTab(item.type === 'vcard' ? 'qr' : 'smart'); restoreQR(item); }} title="Buka QR" className="flex-1 bg-[#ffeb3b] border-2 border-black py-2 rounded-xl font-black text-sm shadow-[4px_4px_0px_0px_#000] hover:shadow-none translate-x-0 hover:translate-x-[2px] hover:translate-y-[2px] transition-all flex items-center justify-center gap-2">
                       <ExternalLink size={16}/> Buka
                     </button>
                     <div className="bg-black text-white px-4 py-2 rounded-xl font-black text-xs flex items-center justify-center">{item.scan_count} SCAN</div>
@@ -496,19 +607,23 @@ export default function Home() {
                   <h3 className="text-2xl font-black uppercase text-gray-300">Belum ada QR yang disimpan</h3>
                   <p className="font-bold text-gray-300">Buat QR pertamamu untuk melihatnya di sini!</p>
                 </div>
-              )}
+                )}
+              </div>
             </motion.div>
           ) : (
             <motion.div key="vcard-tab" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="grid grid-cols-1 lg:grid-cols-12 gap-10">
               <div className="lg:col-span-4 bg-white border-[4px] border-black shadow-[10px_10px_0px_0px_#000] rounded-[2.5rem] p-8">
                 <h3 className="text-2xl font-[900] mb-6 italic uppercase text-black"><Palette size={24} className="inline mr-3" /> Pilih Gaya</h3>
                 <div className="space-y-4">
-                  {[{ id: "minimalist", name: "The Minimalist", color: "#f8f9fa", icon: <Star />, desc: "Bersih & Modern" }, { id: "executive", name: "The Executive", color: "#1a1a1a", icon: <Briefcase />, desc: "Elegan & Mewah", dark: true }, { id: "creative", name: "The Creative", color: "#ffeb3b", icon: <Sparkles />, desc: "Berani & Unik" }].map((t) => (
-                    <button key={t.id} onClick={() => setSelectedTemplate(t.id)} className={`w-full p-5 rounded-2xl border-[3px] border-black text-left transition-all flex items-center gap-4 ${selectedTemplate === t.id ? "bg-[#ffeb3b] shadow-[4px_4px_0px_0px_#000] translate-x-[-2px] translate-y-[-2px]" : "bg-white hover:bg-gray-50 shadow-[2px_2px_0px_0px_#000]"}`}>
-                      <div className="w-12 h-12 rounded-xl border-2 border-black flex items-center justify-center shrink-0" style={{ backgroundColor: t.color, color: t.dark ? 'white' : 'black' }}>{t.icon}</div>
-                      <div><div className="font-black text-lg leading-tight">{t.name}</div><div className="text-xs font-bold opacity-60 uppercase">{t.desc}</div></div>
-                    </button>
-                  ))}
+                  {[{ id: "minimalist", name: "The Minimalist", color: "#f8f9fa", icon: <Star />, desc: "Bersih & Modern" }, { id: "executive", name: "The Executive", color: "#1a1a1a", icon: <Briefcase />, desc: "Elegan & Mewah", dark: true }, { id: "creative", name: "The Creative", color: "#ffeb3b", icon: <Sparkles />, desc: "Berani & Unik" }].map((t) => {
+                    const templateStyle = { backgroundColor: t.color, color: t.dark ? 'white' : 'black' };
+                    return (
+                      <button key={t.id} onClick={() => setSelectedTemplate(t.id)} title={`Pilih Template ${t.name}`} className={`w-full p-5 rounded-2xl border-[3px] border-black text-left transition-all flex items-center gap-4 ${selectedTemplate === t.id ? "bg-[#ffeb3b] shadow-[4px_4px_0px_0px_#000] translate-x-[-2px] translate-y-[-2px]" : "bg-white hover:bg-gray-50 shadow-[2px_2px_0px_0px_#000]"}`}>
+                        <div className="w-12 h-12 rounded-xl border-2 border-black flex items-center justify-center shrink-0" style={templateStyle}>{t.icon}</div>
+                        <div><div className="font-black text-lg leading-tight">{t.name}</div><div className="text-xs font-bold opacity-60 uppercase">{t.desc}</div></div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
               <div className="lg:col-span-8 bg-white border-[4px] border-black shadow-[12px_12px_0px_0px_#000] rounded-[3rem] p-10 flex flex-col items-center">
@@ -537,7 +652,7 @@ export default function Home() {
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowMapModal(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
               <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-white border-[4px] border-black rounded-[2.5rem] shadow-[15px_15px_0px_0px_#000] w-full max-w-3xl overflow-hidden relative z-10 flex flex-col max-h-[90vh]">
-                <div className="p-8 border-b-[4px] border-black flex justify-between items-center bg-[#ffeb3b]"><h3 className="text-2xl font-black uppercase italic">Pilih Lokasi</h3><button onClick={() => setShowMapModal(false)} className="p-2 border-2 border-black rounded-full bg-white"><X /></button></div>
+                <div className="p-8 border-b-[4px] border-black flex justify-between items-center bg-[#ffeb3b]"><h3 className="text-2xl font-black uppercase italic">Pilih Lokasi</h3><button onClick={() => setShowMapModal(false)} className="p-2 border-2 border-black rounded-full bg-white" title="Tutup Map"><X /></button></div>
                 <div className="flex-1 min-h-[400px]"><MapWrapper onLocationSelect={(lat, lon) => { setSmartData({...smartData, lat: lat.toFixed(6), lon: lon.toFixed(6)}); setShowMapModal(false); triggerConfetti(); }} /></div>
               </motion.div>
             </div>
@@ -550,8 +665,9 @@ export default function Home() {
 
 // Helper components
 function NavButton({ active, onClick, icon, label, color }: any) {
+  const buttonStyle = { backgroundColor: active ? color : 'white', color: active && color !== '#ffeb3b' ? 'white' : 'black' };
   return (
-    <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onClick} className={`flex-1 md:flex-none px-6 py-4 rounded-2xl border-[4px] border-black font-[900] uppercase italic tracking-wider transition-all flex items-center justify-center gap-3 ${active ? `shadow-[6px_6px_0px_0px_#000] translate-x-[-2px] translate-y-[-2px]` : `bg-white shadow-[4px_4px_0px_0px_#000] hover:shadow-[6px_6px_0px_0px_#000]`}`} style={{ backgroundColor: active ? color : 'white', color: active && color !== '#ffeb3b' ? 'white' : 'black' }}>{icon}{label}</motion.button>
+    <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onClick} className={`flex-1 md:flex-none px-6 py-4 rounded-2xl border-[4px] border-black font-[900] uppercase italic tracking-wider transition-all flex items-center justify-center gap-3 ${active ? `shadow-[6px_6px_0px_0px_#000] translate-x-[-2px] translate-y-[-2px]` : `bg-white shadow-[4px_4px_0px_0px_#000] hover:shadow-[6px_6px_0px_0px_#000]`}`} style={buttonStyle}>{icon}{label}</motion.button>
   );
 }
 function StatCard({ title, value, icon, color }: any) {
@@ -562,11 +678,7 @@ function StatCard({ title, value, icon, color }: any) {
     </div>
   );
 }
-function MapWrapper({ onLocationSelect }: { onLocationSelect: (lat: number, lon: number) => void }) {
-  const [position, setPosition] = useState<[number, number]>([-6.2088, 106.8456]);
-  function LocationPicker() { useMapEvents({ click(e) { setPosition([e.latlng.lat, e.latlng.lng]); onLocationSelect(e.latlng.lat, e.latlng.lng); } }); return <Marker position={position} />; }
-  return ( <MapContainer center={position} zoom={13} style={{ height: "100%", width: "100%" }}><TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" /><LocationPicker /></MapContainer> );
-}
+// MapWrapper is dynamically imported at the top of the file
 function StyleSection({ formData, handleInputChange, uploading, fileInputRef, handleFileUpload, defaultLogos, setFormData }: any) {
   const [activeStyleTab, setActiveStyleTab] = useState<"dots" | "corners" | "bg">("dots");
   return (
@@ -574,40 +686,40 @@ function StyleSection({ formData, handleInputChange, uploading, fileInputRef, ha
       <div className="flex items-center gap-4 mb-8"><div className="w-12 h-12 bg-[#ffeb3b] border-[3px] border-black rounded-2xl flex items-center justify-center text-black shadow-[4px_4px_0px_0px_#000]"><Palette size={24} /></div><h2 className="text-3xl font-[900] text-black italic uppercase tracking-tight">Gaya Kustom</h2></div>
       <div className="flex gap-2 mb-8 bg-gray-100 p-2 rounded-2xl border-2 border-black shadow-inner">
         {[{ id: 'dots', name: 'Titik', icon: <Circle size={16}/> }, { id: 'corners', name: 'Pojok', icon: <Square size={16}/> }, { id: 'bg', name: 'BG & Logo', icon: <Layout size={16}/> }].map(tab => (
-          <button key={tab.id} onClick={() => setActiveStyleTab(tab.id as any)} className={`flex-1 py-2 rounded-xl font-black text-xs uppercase flex items-center justify-center gap-2 transition-all ${activeStyleTab === tab.id ? 'bg-white border-2 border-black shadow-[2px_2px_0px_0px_#000]' : 'text-gray-500 hover:text-black'}`}>{tab.icon}{tab.name}</button>
+          <button key={tab.id} onClick={() => setActiveStyleTab(tab.id as any)} title={`Tab ${tab.name}`} className={`flex-1 py-2 rounded-xl font-black text-xs uppercase flex items-center justify-center gap-2 transition-all ${activeStyleTab === tab.id ? 'bg-white border-2 border-black shadow-[2px_2px_0px_0px_#000]' : 'text-gray-500 hover:text-black'}`}>{tab.icon}{tab.name}</button>
         ))}
       </div>
       <AnimatePresence mode="wait">
         {activeStyleTab === 'dots' && (
           <motion.div key="dots" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-3"><label className="text-sm font-[900] uppercase ml-1">Bentuk Titik</label><select name="dotsType" value={formData.dotsType} onChange={handleInputChange} className="w-full bg-white border-[3px] border-black rounded-2xl px-6 py-4 font-bold shadow-[4px_4px_0px_0px_#000] appearance-none"><option value="rounded">Rounded</option><option value="dots">Dots</option><option value="classy">Classy</option><option value="square">Square</option></select></div>
-            <div className="space-y-3"><label className="text-sm font-[900] uppercase ml-1">Warna 1</label><div className="flex gap-4"><input type="color" name="dotsColor" value={formData.dotsColor} onChange={handleInputChange} className="h-14 w-14 bg-white border-[3px] border-black rounded-xl cursor-pointer p-1" /><div className="flex-1 bg-gray-50 border-[3px] border-black rounded-xl px-4 flex items-center font-black uppercase text-sm tracking-widest">{formData.dotsColor}</div></div></div>
-            <div className="space-y-3"><label className="text-sm font-[900] uppercase ml-1">Warna 2</label><div className="flex gap-4"><input type="color" name="gradientColor2" value={formData.gradientColor2} onChange={handleInputChange} className="h-14 w-14 bg-white border-[3px] border-black rounded-xl cursor-pointer p-1" /><div className="flex-1 bg-gray-50 border-[3px] border-black rounded-xl px-4 flex items-center font-black uppercase text-sm tracking-widest">{formData.gradientColor2}</div></div></div>
+            <div className="space-y-3"><label className="text-sm font-[900] uppercase ml-1">Bentuk Titik</label><select name="dotsType" value={formData.dotsType} onChange={handleInputChange} title="Pilih Bentuk Titik" className="w-full bg-white border-[3px] border-black rounded-2xl px-6 py-4 font-bold shadow-[4px_4px_0px_0px_#000] appearance-none"><option value="rounded">Rounded</option><option value="dots">Dots</option><option value="classy">Classy</option><option value="square">Square</option></select></div>
+            <div className="space-y-3"><label className="text-sm font-[900] uppercase ml-1">Warna 1</label><div className="flex gap-4"><input type="color" name="dotsColor" value={formData.dotsColor} onChange={handleInputChange} title="Pilih Warna 1" className="h-14 w-14 bg-white border-[3px] border-black rounded-xl cursor-pointer p-1" /><div className="flex-1 bg-gray-50 border-[3px] border-black rounded-xl px-4 flex items-center font-black uppercase text-sm tracking-widest">{formData.dotsColor}</div></div></div>
+            <div className="space-y-3"><label className="text-sm font-[900] uppercase ml-1">Warna 2</label><div className="flex gap-4"><input type="color" name="gradientColor2" value={formData.gradientColor2} onChange={handleInputChange} title="Pilih Warna 2" className="h-14 w-14 bg-white border-[3px] border-black rounded-xl cursor-pointer p-1" /><div className="flex-1 bg-gray-50 border-[3px] border-black rounded-xl px-4 flex items-center font-black uppercase text-sm tracking-widest">{formData.gradientColor2}</div></div></div>
           </motion.div>
         )}
         {activeStyleTab === 'corners' && (
           <motion.div key="corners" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-3"><label className="text-sm font-[900] uppercase ml-1">Frame Pojok</label><select name="cornersSquareType" value={formData.cornersSquareType} onChange={handleInputChange} className="w-full bg-white border-[3px] border-black rounded-2xl px-6 py-4 font-bold shadow-[4px_4px_0px_0px_#000] appearance-none"><option value="square">Square</option><option value="dot">Dot</option><option value="extra-rounded">Extra Rounded</option></select></div>
-            <div className="space-y-3"><label className="text-sm font-[900] uppercase ml-1">Warna Frame</label><input type="color" name="cornersSquareColor" value={formData.cornersSquareColor} onChange={handleInputChange} className="h-14 w-full bg-white border-[3px] border-black rounded-xl cursor-pointer p-1" /></div>
-            <div className="space-y-3"><label className="text-sm font-[900] uppercase ml-1">Titik Pojok</label><select name="cornersDotType" value={formData.cornersDotType} onChange={handleInputChange} className="w-full bg-white border-[3px] border-black rounded-2xl px-6 py-4 font-bold shadow-[4px_4px_0px_0px_#000] appearance-none"><option value="square">Square</option><option value="dot">Dot</option></select></div>
-            <div className="space-y-3"><label className="text-sm font-[900] uppercase ml-1">Warna Titik Pojok</label><input type="color" name="cornersDotColor" value={formData.cornersDotColor} onChange={handleInputChange} className="h-14 w-full bg-white border-[3px] border-black rounded-xl cursor-pointer p-1" /></div>
+            <div className="space-y-3"><label className="text-sm font-[900] uppercase ml-1">Frame Pojok</label><select name="cornersSquareType" value={formData.cornersSquareType} onChange={handleInputChange} title="Pilih Frame Pojok" className="w-full bg-white border-[3px] border-black rounded-2xl px-6 py-4 font-bold shadow-[4px_4px_0px_0px_#000] appearance-none"><option value="square">Square</option><option value="dot">Dot</option><option value="extra-rounded">Extra Rounded</option></select></div>
+            <div className="space-y-3"><label className="text-sm font-[900] uppercase ml-1">Warna Frame</label><input type="color" name="cornersSquareColor" value={formData.cornersSquareColor} onChange={handleInputChange} title="Pilih Warna Frame" className="h-14 w-full bg-white border-[3px] border-black rounded-xl cursor-pointer p-1" /></div>
+            <div className="space-y-3"><label className="text-sm font-[900] uppercase ml-1">Titik Pojok</label><select name="cornersDotType" value={formData.cornersDotType} onChange={handleInputChange} title="Pilih Titik Pojok" className="w-full bg-white border-[3px] border-black rounded-2xl px-6 py-4 font-bold shadow-[4px_4px_0px_0px_#000] appearance-none"><option value="square">Square</option><option value="dot">Dot</option></select></div>
+            <div className="space-y-3"><label className="text-sm font-[900] uppercase ml-1">Warna Titik Pojok</label><input type="color" name="cornersDotColor" value={formData.cornersDotColor} onChange={handleInputChange} title="Pilih Warna Titik Pojok" className="h-14 w-full bg-white border-[3px] border-black rounded-xl cursor-pointer p-1" /></div>
           </motion.div>
         )}
         {activeStyleTab === 'bg' && (
           <motion.div key="bg" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-3"><label className="text-sm font-[900] uppercase ml-1">Warna Background</label><input type="color" name="backgroundColor" value={formData.backgroundColor} onChange={handleInputChange} className="h-14 w-full bg-white border-[3px] border-black rounded-xl p-1 shadow-[3px_3px_0px_0px_#000]" /></div>
-              <div className="flex flex-col justify-end pb-1"><label className="flex items-center gap-3 cursor-pointer group"><input type="checkbox" className="appearance-none w-7 h-7 border-[3px] border-black rounded-lg cursor-pointer checked:bg-[#ffeb3b]" checked={formData.hideBackgroundDots} onChange={(e) => setFormData({...formData, hideBackgroundDots: e.target.checked})} /><span className="font-[900] text-sm group-hover:text-[#2196f3] uppercase transition-colors">Hapus Titik di Logo</span></label></div>
+              <div className="space-y-3"><label className="text-sm font-[900] uppercase ml-1">Warna Background</label><input type="color" name="backgroundColor" value={formData.backgroundColor} onChange={handleInputChange} title="Pilih Warna Background" className="h-14 w-full bg-white border-[3px] border-black rounded-xl p-1 shadow-[3px_3px_0px_0px_#000]" /></div>
+              <div className="flex flex-col justify-end pb-1"><label className="flex items-center gap-3 cursor-pointer group"><input type="checkbox" className="appearance-none w-7 h-7 border-[3px] border-black rounded-lg cursor-pointer checked:bg-[#ffeb3b]" checked={formData.hideBackgroundDots} onChange={(e) => setFormData({...formData, hideBackgroundDots: e.target.checked})} title="Hapus Titik di Logo" /><span className="font-[900] text-sm group-hover:text-[#2196f3] uppercase transition-colors">Hapus Titik di Logo</span></label></div>
             </div>
             <div className="space-y-4 border-t-2 border-black pt-6">
               <div className="flex flex-wrap gap-3 mt-4">
-                {defaultLogos.map((logo: any) => (<button key={logo.name} onClick={() => setFormData({...formData, logoUrl: logo.url})} className={`w-12 h-12 rounded-xl border-[2px] border-black bg-white p-2 shadow-[2px_2px_0px_0px_#000] ${formData.logoUrl === logo.url ? 'bg-yellow-100 ring-2 ring-blue-500' : ''}`}><img src={logo.url} alt={logo.name} className="w-full h-full object-contain" /></button>))}
+                {defaultLogos.map((logo: any) => (<button key={logo.name} onClick={() => setFormData({...formData, logoUrl: logo.url})} title={`Gunakan Logo ${logo.name}`} className={`w-12 h-12 rounded-xl border-[2px] border-black bg-white p-2 shadow-[2px_2px_0px_0px_#000] ${formData.logoUrl === logo.url ? 'bg-yellow-100 ring-2 ring-blue-500' : ''}`}><img src={logo.url} alt={logo.name} className="w-full h-full object-contain" /></button>))}
                 <button onClick={() => fileInputRef.current?.click()} className="w-12 h-12 rounded-xl border-2 border-black bg-blue-500 text-white flex items-center justify-center shadow-[2px_2px_0px_0px_#000]" title="Upload Logo"><Upload size={20}/></button>
                 {formData.logoUrl && (
                   <button onClick={() => setFormData({...formData, logoUrl: ""})} className="w-12 h-12 rounded-xl border-2 border-black bg-red-500 text-white flex items-center justify-center shadow-[2px_2px_0px_0px_#000]" title="Hapus Logo"><Trash2 size={20}/></button>
                 )}
               </div>
-              <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
+              <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleFileUpload} title="File Logo" />
             </div>
           </motion.div>
         )}
@@ -744,49 +856,131 @@ function PreviewSection({ title, qrImage, loading, onGenerate, buttonText, frame
         <div className="mb-8 mt-6 bg-[#ffeb3b] border-[3px] border-black px-6 py-2 rounded-full text-sm font-[900] uppercase shadow-[4px_4px_0px_0px_#000] italic">{title}</div>
 
         {/* QR with Frame Preview */}
-        <div className="relative" style={{ padding: frameConfig.style !== "none" ? "20px" : "0" }}>
-          {frameConfig.style !== "none" && (
-            <div className={`absolute inset-0 ${frameConfig.style === 'circle' ? 'rounded-full' : 'rounded-[2.5rem]'}`} style={{ backgroundColor: frameConfig.frameColor, border: '4px solid black', boxShadow: '10px 10px 0px 0px black' }} />
-          )}
-          <div className={`bg-white p-8 border-[4px] border-black rounded-[2rem] shadow-[6px_6px_0px_0px_#000] relative z-10 ${frameConfig.style === 'circle' ? 'rounded-full overflow-hidden' : ''}`}>
-            <AnimatePresence mode="wait">
-              {qrImage ? <motion.img key={qrImage} initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} src={qrImage} className={`w-full max-w-[280px] aspect-square object-contain`} /> : <div className="w-72 h-72 flex items-center justify-center"><RefreshCw className="animate-spin text-gray-200" size={80} /></div>}
-            </AnimatePresence>
-          </div>
-          {frameConfig.style !== "none" && (
-            <div className="relative z-10 mt-3 text-center">
-              <span className={`inline-block px-6 py-2 font-[900] uppercase text-sm tracking-[0.2em] ${frameConfig.style === 'badge' ? 'border-2 border-black rounded-full shadow-[2px_2px_0px_0px_#000]' : ''}`} style={{ backgroundColor: frameConfig.style === 'badge' ? frameConfig.frameColor : 'transparent', color: frameConfig.style === 'badge' ? frameConfig.labelColor : frameConfig.frameColor }}>
-                {frameConfig.customLabel || frameConfig.label}
-              </span>
+        {(() => {
+          const frameContainerStyle = { padding: frameConfig.style !== "none" ? "20px" : "0" };
+          const frameBgStyle = { backgroundColor: frameConfig.frameColor, border: '4px solid black', boxShadow: '10px 10px 0px 0px black' };
+          const labelStyle = { backgroundColor: frameConfig.style === 'badge' ? frameConfig.frameColor : 'transparent', color: frameConfig.style === 'badge' ? frameConfig.labelColor : frameConfig.frameColor };
+          
+          return (
+            <div className="relative" style={frameContainerStyle}>
+              {frameConfig.style !== "none" && (
+                <div className={`absolute inset-0 ${frameConfig.style === 'circle' ? 'rounded-full' : 'rounded-[2.5rem]'}`} style={frameBgStyle} />
+              )}
+              <div className={`bg-white p-8 border-[4px] border-black rounded-[2rem] shadow-[6px_6px_0px_0px_#000] relative z-10 ${frameConfig.style === 'circle' ? 'rounded-full overflow-hidden' : ''}`}>
+                <AnimatePresence mode="wait">
+                  {qrImage ? <motion.img key={qrImage} initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} src={qrImage} className={`w-full max-w-[280px] aspect-square object-contain`} /> : (
+                    <div className="w-72 h-72 flex flex-col items-center justify-center gap-4">
+                      {/* Animated Printing Machine */}
+                      <div className="relative w-40 h-48">
+                        {/* Machine Body */}
+                        <motion.div 
+                          animate={{ y: [0, -2, 0] }}
+                          transition={{ duration: 1.5, repeat: Infinity }}
+                          className="absolute bottom-12 left-0 right-0"
+                        >
+                          {/* Printer top */}
+                          <div className="mx-auto w-36 h-8 bg-[#333] border-[3px] border-black rounded-t-2xl relative">
+                            <div className="absolute top-1.5 right-3 w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                            <div className="absolute top-1.5 left-3 flex gap-1">
+                              <div className="w-1.5 h-1.5 bg-gray-500 rounded-full" />
+                              <div className="w-1.5 h-1.5 bg-gray-500 rounded-full" />
+                            </div>
+                          </div>
+                          {/* Printer slot */}
+                          <div className="mx-auto w-36 h-3 bg-[#222] border-x-[3px] border-black" />
+                          {/* Printer body */}
+                          <div className="mx-auto w-36 h-14 bg-[#444] border-[3px] border-black rounded-b-xl relative overflow-hidden">
+                            <motion.div
+                              animate={{ x: [-40, 40, -40] }}
+                              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                              className="absolute top-2 left-1/2 -translate-x-1/2 w-8 h-1.5 bg-[#ffeb3b] rounded-full"
+                            />
+                            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-3">
+                              <div className="w-3 h-3 bg-[#f44336] rounded-sm border border-black" />
+                              <div className="w-3 h-3 bg-[#2196f3] rounded-sm border border-black" />
+                              <div className="w-3 h-3 bg-[#ffeb3b] rounded-sm border border-black" />
+                            </div>
+                          </div>
+                        </motion.div>
+                        {/* Paper coming out */}
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: [0, 60, 30, 60], opacity: 1 }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                          className="absolute bottom-0 left-1/2 -translate-x-1/2 w-28 bg-white border-[2px] border-black rounded-b-lg overflow-hidden"
+                        >
+                          <div className="p-2 flex items-center justify-center h-full">
+                            <motion.div
+                              animate={{ opacity: [0.2, 0.6, 0.2] }}
+                              transition={{ duration: 1.5, repeat: Infinity }}
+                            >
+                              <QrCode size={30} className="text-gray-300" />
+                            </motion.div>
+                          </div>
+                        </motion.div>
+                      </div>
+                      {/* Progress bar */}
+                      <div className="w-40 h-3 bg-gray-200 rounded-full border-2 border-black overflow-hidden">
+                        <motion.div
+                          animate={{ width: ["0%", "100%"] }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                          className="h-full bg-[#ffeb3b] rounded-full"
+                        />
+                      </div>
+                      {/* Fun status text */}
+                      <motion.p
+                        animate={{ opacity: [0.5, 1, 0.5] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                        className="text-xs font-black uppercase tracking-widest text-gray-400"
+                      >
+                        <motion.span
+                          key="text"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                        >
+                          Mencetak QR...
+                        </motion.span>
+                      </motion.p>
+                    </div>
+                  )}
+                </AnimatePresence>
+              </div>
+              {frameConfig.style !== "none" && (
+                <div className="relative z-10 mt-3 text-center">
+                  <span className={`inline-block px-6 py-2 font-[900] uppercase text-sm tracking-[0.2em] ${frameConfig.style === 'badge' ? 'border-2 border-black rounded-full shadow-[2px_2px_0px_0px_#000]' : ''}`} style={labelStyle}>
+                    {frameConfig.customLabel || frameConfig.label}
+                  </span>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          );
+        })()}
 
         {/* Frame Options */}
         <div className="mt-8 w-full space-y-5">
           <div className="flex gap-2 bg-gray-100 p-2 rounded-2xl border-2 border-black">
             {frameStyles.map(f => (
-              <button key={f.id} onClick={() => setFrameConfig({...frameConfig, style: f.id})} className={`flex-1 py-2 rounded-xl font-black text-[10px] uppercase flex items-center justify-center gap-1 transition-all ${frameConfig.style === f.id ? 'bg-white border-2 border-black shadow-[2px_2px_0px_0px_#000]' : 'text-gray-400 hover:text-black'}`}>{f.icon}{f.name}</button>
+              <button key={f.id} onClick={() => setFrameConfig({...frameConfig, style: f.id})} title={`Gaya Frame: ${f.name}`} className={`flex-1 py-2 rounded-xl font-black text-[10px] uppercase flex items-center justify-center gap-1 transition-all ${frameConfig.style === f.id ? 'bg-white border-2 border-black shadow-[2px_2px_0px_0px_#000]' : 'text-gray-400 hover:text-black'}`}>{f.icon}{f.name}</button>
             ))}
           </div>
           {frameConfig.style !== "none" && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-4">
               <div className="flex flex-wrap gap-2">
                 {labelPresets.map(label => (
-                  <button key={label} onClick={() => setFrameConfig({...frameConfig, label, customLabel: ""})} className={`px-3 py-1.5 rounded-xl border-2 border-black font-black text-[10px] uppercase transition-all ${frameConfig.label === label && !frameConfig.customLabel ? 'bg-[#ffeb3b] shadow-[2px_2px_0px_0px_#000]' : 'bg-white hover:bg-gray-50 shadow-[1px_1px_0px_0px_#000]'}`}>{label}</button>
+                  <button key={label} onClick={() => setFrameConfig({...frameConfig, label, customLabel: ""})} title={`Preset Label: ${label}`} className={`px-3 py-1.5 rounded-xl border-2 border-black font-black text-[10px] uppercase transition-all ${frameConfig.label === label && !frameConfig.customLabel ? 'bg-[#ffeb3b] shadow-[2px_2px_0px_0px_#000]' : 'bg-white hover:bg-gray-50 shadow-[1px_1px_0px_0px_#000]'}`}>{label}</button>
                 ))}
               </div>
-              <input type="text" value={frameConfig.customLabel} onChange={(e) => setFrameConfig({...frameConfig, customLabel: e.target.value})} placeholder="Atau tulis label sendiri..." className="w-full bg-white border-[3px] border-black rounded-xl px-4 py-3 font-[900] text-sm shadow-[3px_3px_0px_0px_#000] outline-none placeholder:text-gray-300" />
+              <input type="text" value={frameConfig.customLabel} onChange={(e) => setFrameConfig({...frameConfig, customLabel: e.target.value})} title="Kustom Label Frame" placeholder="Atau tulis label sendiri..." className="w-full bg-white border-[3px] border-black rounded-xl px-4 py-3 font-[900] text-sm shadow-[3px_3px_0px_0px_#000] outline-none placeholder:text-gray-300" />
               <div className="flex gap-4">
-                <div className="flex-1 space-y-1"><label className="text-[10px] font-black uppercase">Warna Frame</label><input type="color" value={frameConfig.frameColor} onChange={(e) => setFrameConfig({...frameConfig, frameColor: e.target.value})} className="h-10 w-full bg-white border-2 border-black rounded-lg p-1" /></div>
-                <div className="flex-1 space-y-1"><label className="text-[10px] font-black uppercase">Warna Label</label><input type="color" value={frameConfig.labelColor} onChange={(e) => setFrameConfig({...frameConfig, labelColor: e.target.value})} className="h-10 w-full bg-white border-2 border-black rounded-lg p-1" /></div>
+                <div className="flex-1 space-y-1"><label className="text-[10px] font-black uppercase">Warna Frame</label><input type="color" value={frameConfig.frameColor} onChange={(e) => setFrameConfig({...frameConfig, frameColor: e.target.value})} title="Pilih Warna Frame" className="h-10 w-full bg-white border-2 border-black rounded-lg p-1" /></div>
+                <div className="flex-1 space-y-1"><label className="text-[10px] font-black uppercase">Warna Label</label><input type="color" value={frameConfig.labelColor} onChange={(e) => setFrameConfig({...frameConfig, labelColor: e.target.value})} title="Pilih Warna Label" className="h-10 w-full bg-white border-2 border-black rounded-lg p-1" /></div>
               </div>
             </motion.div>
           )}
         </div>
 
         <div className="mt-8 flex flex-col gap-6 w-full">
-          <button onClick={onGenerate} disabled={loading} className="w-full bg-[#ffeb3b] border-[4px] border-black py-6 rounded-[2rem] font-[900] text-2xl shadow-[8px_8px_0px_0px_#000] hover:shadow-none hover:translate-x-[5px] hover:translate-y-[5px] transition-all flex items-center justify-center gap-4 uppercase"><RefreshCw size={28} className={loading ? "animate-spin" : ""} /> {loading ? "Sabar..." : buttonText}</button>
+          <button onClick={onGenerate} disabled={loading} className={`w-full border-[4px] border-black py-6 rounded-[2rem] font-[900] text-2xl shadow-[8px_8px_0px_0px_#000] hover:shadow-none hover:translate-x-[5px] hover:translate-y-[5px] transition-all flex items-center justify-center gap-4 uppercase ${loading ? 'bg-gray-300 cursor-wait' : 'bg-[#ffeb3b]'}`}>{loading ? <><Sparkles size={28} className="animate-spin" /> Sedang Mencetak...</> : <><RefreshCw size={28} /> {buttonText}</>}</button>
           {qrImage && (
             <div className="flex gap-4">
               <a href={qrImage} download="BikinQR.png" className="flex-1 bg-[#2196f3] text-white border-[4px] border-black py-5 rounded-[2rem] font-[900] text-lg shadow-[6px_6px_0px_0px_#000] hover:shadow-none hover:translate-x-[3px] hover:translate-y-[3px] transition-all flex items-center justify-center gap-3 uppercase"><Download size={24} /> QR Only</a>
@@ -807,7 +1001,7 @@ function CartoonInput({ id, label, name, value, onChange, icon, className = "", 
       <label htmlFor={id} className="text-sm font-[900] uppercase ml-1 tracking-wider">{label}</label>
       <div className="relative group">
         <div className="absolute left-5 top-1/2 -translate-y-1/2 z-10">{icon}</div>
-        <input id={id} type="text" name={name} value={value} onChange={onChange} placeholder={placeholder || `Isi ${label.toLowerCase()}...`} className="w-full bg-white border-[3px] border-black rounded-2xl pl-14 pr-6 py-5 font-[900] text-lg shadow-[6px_6px_0px_0px_#000] focus:translate-x-[3px] focus:translate-y-[3px] focus:shadow-none transition-all outline-none placeholder:text-gray-300 tracking-tight" />
+        <input id={id} type="text" name={name} value={value} onChange={onChange} title={label} placeholder={placeholder || `Isi ${label.toLowerCase()}...`} className="w-full bg-white border-[3px] border-black rounded-2xl pl-14 pr-6 py-5 font-[900] text-lg shadow-[6px_6px_0px_0px_#000] focus:translate-x-[3px] focus:translate-y-[3px] focus:shadow-none transition-all outline-none placeholder:text-gray-300 tracking-tight" />
       </div>
     </div>
   );

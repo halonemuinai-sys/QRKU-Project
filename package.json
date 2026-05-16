@@ -16,6 +16,7 @@
   "dependencies": {
     "@loskir/styled-qr-code-node": "^2.0.0",
     "@supabase/supabase-js": "^2.105.4",
+    "axios": "^1.16.1",
     "canvas": "^3.2.3",
     "clsx": "^2.1.1",
     "concurrently": "^9.2.1",
@@ -29,6 +30,7 @@
     "nodemon": "^3.1.14",
     "qrcode": "^1.5.4",
     "tailwind-merge": "^3.6.0",
+    "ua-parser-js": "^2.0.9",
     "vcards-js": "^2.10.0"
   }
 }

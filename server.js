@@ -8,6 +8,8 @@ const { nanoid } = require('nanoid');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const axios = require('axios');
+const UAParser = require('ua-parser-js');
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -69,11 +71,14 @@ app.post('/generate', async (req, res) => {
 
         console.log("Generating vCard QR for:", firstName, lastName);
         
+        const userId = req.headers['x-user-id'];
+
         const { data, error } = await supabase
             .from('dynamic_links')
             .insert([{
                 short_id: shortId,
                 type: 'vcard',
+                user_id: userId || null,
                 first_name: firstName,
                 last_name: lastName,
                 organization: organization,
@@ -125,12 +130,15 @@ app.post('/generate-basic', async (req, res) => {
 
         const shortId = nanoid(6);
 
+        const userId = req.headers['x-user-id'];
+
         // Save to DB for Gallery
         const { error } = await supabase
             .from('dynamic_links')
             .insert([{
                 short_id: shortId,
                 type: type,
+                user_id: userId || null,
                 raw_data: rawData || { content: qrData },
                 dots_color: dotsColor,
                 gradient_color: gradientColor2,
@@ -146,7 +154,10 @@ app.post('/generate-basic', async (req, res) => {
 
         if (error) throw error;
 
-        const buffer = await generateQrBuffer(qrData, req.body);
+        // Dynamic link for tracking
+        const dynamicUrl = `http://localhost:3001/v/${shortId}`;
+        const buffer = await generateQrBuffer(dynamicUrl, req.body);
+        
         res.type('png');
         res.send(buffer);
     } catch (error) {
@@ -192,7 +203,133 @@ async function generateQrBuffer(qrData, options) {
     return await qrCode.toBuffer('png');
 }
 
+/**
+ * @api {get} /v/:shortId Redirect to Digital Profile Landing Page
+ */
 app.get('/v/:shortId', async (req, res) => {
+    const { shortId } = req.params;
+    console.log(`[SCAN ATTEMPT] ShortID: ${shortId}`);
+
+    try {
+        const { data, error } = await supabase
+            .from('dynamic_links')
+            .select('*')
+            .eq('short_id', shortId)
+            .single();
+
+        if (error || !data) {
+            console.error(`[SCAN ERROR] Link not found: ${shortId}`);
+            return res.status(404).send('Contact not found');
+        }
+
+        // Async logging with Geo and UA parsing
+        const logScan = async () => {
+            try {
+                const userAgent = req.headers['user-agent'] || 'Unknown';
+                const parser = new UAParser(userAgent);
+                const ua = parser.getResult();
+                
+                // Get IP (Handle various environments)
+                let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
+                if (Array.isArray(ip)) ip = ip[0];
+                if (ip === '::1' || ip === '127.0.0.1' || !ip) ip = '8.8.8.8'; 
+
+                let geoData = { city: 'Unknown', country: 'Unknown', lat: 0, lon: 0 };
+                try {
+                    // Added timeout and better error handling
+                    const geoRes = await axios.get(`http://ip-api.com/json/${ip}`, { timeout: 3000 });
+                    if (geoRes.data && geoRes.data.status === 'success') {
+                        geoData = {
+                            city: geoRes.data.city,
+                            country: geoRes.data.country,
+                            lat: geoRes.data.lat,
+                            lon: geoRes.data.lon
+                        };
+                    }
+                } catch (e) { console.error("Geo API Error:", e.message); }
+
+                const { error: logError } = await supabase.from('scan_logs').insert([{ 
+                    link_id: data.id, 
+                    user_agent: userAgent,
+                    ip_address: ip,
+                    city: geoData.city,
+                    country: geoData.country,
+                    lat: geoData.lat,
+                    lon: geoData.lon,
+                    os: ua.os.name || 'Unknown',
+                    browser: ua.browser.name || 'Unknown'
+                }]);
+                
+                if (logError) console.error("Supabase Scan Log Error:", logError);
+
+                const { error: updError } = await supabase.from('dynamic_links')
+                    .update({ scan_count: (data.scan_count || 0) + 1 })
+                    .eq('id', data.id);
+                
+                if (updError) console.error("Update scan_count error:", updError);
+                
+                console.log(`[SCAN SUCCESS] Link: ${shortId}, IP: ${ip}, City: ${geoData.city}`);
+            } catch (err) { console.error("Fatal logging error:", err); }
+        };
+
+        // Don't await logScan, so the user gets redirected immediately
+        logScan();
+
+        // Redirect Logic based on type
+        if (data.type === 'vcard') {
+            return res.redirect(`http://localhost:3000/v/${shortId}`);
+        } else if (data.type === 'link' || data.type === 'whatsapp' || data.type === 'instagram' || data.type === 'tiktok') {
+            const targetUrl = data.raw_data?.content || data.raw_data?.url || `https://wa.me/${data.raw_data?.waNumber}`;
+            // If it's a social media/wa type, reconstruct the URL if content is missing
+            let finalUrl = data.raw_data?.content || data.raw_data?.url;
+            
+            if (data.type === 'whatsapp') {
+                const cleanNumber = data.raw_data?.waNumber?.replace(/[^0-9+]/g, '');
+                const message = encodeURIComponent(data.raw_data?.waMessage || '');
+                finalUrl = `https://wa.me/${cleanNumber}?text=${message}`;
+            } else if (data.type === 'instagram') {
+                finalUrl = `https://instagram.com/${data.raw_data?.igUsername?.replace('@', '')}`;
+            } else if (data.type === 'tiktok') {
+                finalUrl = `https://tiktok.com/@${data.raw_data?.ttUsername?.replace('@', '')}`;
+            }
+
+            return res.redirect(finalUrl || '/');
+        } else if (data.type === 'maps') {
+            const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${data.raw_data?.lat},${data.raw_data?.lon}`;
+            return res.redirect(mapsUrl);
+        }
+
+        // Fallback for unknown types
+        return res.redirect(`http://localhost:3000/v/${shortId}`);
+    } catch (error) {
+        console.error("Critical redirect error:", error);
+        res.status(500).send('Internal Server Error');
+    }
+});
+
+/**
+ * @api {get} /api/contact/:shortId Get contact data as JSON
+ */
+app.get('/api/contact/:shortId', async (req, res) => {
+    try {
+        const { shortId } = req.params;
+        const { data, error } = await supabase
+            .from('dynamic_links')
+            .select('*')
+            .eq('short_id', shortId)
+            .single();
+
+        if (error || !data) return res.status(404).json({ error: 'Contact not found' });
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * @api {get} /api/contact/:shortId/download Download vCard file
+ */
+app.get('/api/contact/:shortId/download', async (req, res) => {
     try {
         const { shortId } = req.params;
         const { data, error } = await supabase
@@ -202,14 +339,6 @@ app.get('/v/:shortId', async (req, res) => {
             .single();
 
         if (error || !data) return res.status(404).send('Contact not found');
-
-        // Async logging
-        supabase.from('dynamic_links').update({ scan_count: (data.scan_count || 0) + 1 }).eq('id', data.id).then();
-        supabase.from('scan_logs').insert([{ 
-            link_id: data.id, 
-            user_agent: req.headers['user-agent'],
-            ip_address: req.ip 
-        }]).then();
 
         const vCard = vCardsJS();
         vCard.firstName = data.first_name;
@@ -233,30 +362,80 @@ app.get('/v/:shortId', async (req, res) => {
 
 app.get('/analytics', async (req, res) => {
     try {
-        const { data: logs, error: logError } = await supabase
+        const userId = req.headers['x-user-id'];
+
+        // Get user's link IDs first
+        let linkIds = [];
+        if (userId) {
+            const { data: userLinks, error: uLinkErr } = await supabase
+                .from('dynamic_links')
+                .select('id')
+                .eq('user_id', userId);
+            
+            if (uLinkErr) console.error("Error fetching user links:", uLinkErr);
+            linkIds = (userLinks || []).map(l => l.id);
+            console.log(`User ${userId} has ${linkIds.length} links.`);
+        }
+
+        let logsQuery = supabase
             .from('scan_logs')
-            .select('scanned_at')
+            .select('scanned_at, os, city, country, lat, lon, link_id')
             .order('scanned_at', { ascending: true });
 
+        // Filter logs only if user has links. If no links, return empty instead of all logs.
+        if (userId) {
+            if (linkIds.length > 0) {
+                logsQuery = logsQuery.in('link_id', linkIds);
+            } else {
+                return res.json({ chartData: [], osDistribution: [], mapMarkers: [], topCards: [], totalScans: 0 });
+            }
+        }
+
+        const { data: logs, error: logError } = await logsQuery;
         if (logError) throw logError;
 
+        // Daily Scans
         const dailyData = logs.reduce((acc, log) => {
             const date = new Date(log.scanned_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
             acc[date] = (acc[date] || 0) + 1;
             return acc;
         }, {});
-
         const chartData = Object.entries(dailyData).map(([name, scans]) => ({ name, scans }));
 
-        const { data: topCards, error: cardError } = await supabase
+        // OS Distribution
+        const osData = logs.reduce((acc, log) => {
+            const name = log.os || 'Unknown';
+            acc[name] = (acc[name] || 0) + 1;
+            return acc;
+        }, {});
+        const osDistribution = Object.entries(osData).map(([name, value]) => ({ name, value }));
+
+        // Map Markers
+        const mapMarkers = logs.filter(l => l.lat && l.lon).map(l => ({
+            position: [l.lat, l.lon],
+            city: l.city,
+            country: l.country
+        }));
+
+        let topQuery = supabase
             .from('dynamic_links')
             .select('first_name, last_name, scan_count')
             .order('scan_count', { ascending: false })
             .limit(5);
 
+        if (userId) topQuery = topQuery.eq('user_id', userId);
+
+        const { data: topCards, error: cardError } = await topQuery;
+
         if (cardError) throw cardError;
 
-        res.json({ chartData, topCards, totalScans: logs.length });
+        res.json({ 
+            chartData, 
+            osDistribution,
+            mapMarkers,
+            topCards, 
+            totalScans: logs.length 
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -268,10 +447,15 @@ app.get('/analytics', async (req, res) => {
 
 app.get('/gallery', async (req, res) => {
     try {
-        const { data, error } = await supabase
+        const userId = req.headers['x-user-id'];
+        let query = supabase
             .from('dynamic_links')
             .select('*')
             .order('created_at', { ascending: false });
+
+        if (userId) query = query.eq('user_id', userId);
+
+        const { data, error } = await query;
 
         if (error) throw error;
         res.json(data);
@@ -281,8 +465,25 @@ app.get('/gallery', async (req, res) => {
 });
 
 /**
- * @api {delete} /gallery/:id Delete a QR
+ * @api {delete} /gallery Delete all QRs
  */
+app.delete('/gallery', async (req, res) => {
+    try {
+        const userId = req.headers['x-user-id'];
+        let query = supabase.from('dynamic_links').delete();
+        if (userId) {
+            query = query.eq('user_id', userId);
+        } else {
+            query = query.not('id', 'is', null);
+        }
+        const { error } = await query;
+        if (error) throw error;
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.delete('/gallery/:id', async (req, res) => {
     try {
         const { error } = await supabase.from('dynamic_links').delete().eq('id', req.params.id);

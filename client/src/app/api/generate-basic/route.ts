@@ -3,6 +3,8 @@ import { supabaseServer } from '@/lib/supabase-server';
 import { nanoid } from 'nanoid';
 import QRCode from 'qrcode';
 
+export const dynamic = 'force-dynamic';
+
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 
 export async function POST(req: NextRequest) {

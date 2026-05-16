@@ -16,8 +16,12 @@ const port = process.env.PORT || 3001;
 
 // 1. Multer Setup for Local Uploads
 const uploadDir = 'uploads';
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir);
+try {
+    if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir);
+    }
+} catch (e) {
+    console.warn('Could not create uploads dir (read-only filesystem):', e.message);
 }
 
 const storage = multer.diskStorage({

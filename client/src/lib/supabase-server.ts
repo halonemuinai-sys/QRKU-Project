@@ -1,8 +1,8 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 
-let _supabase: SupabaseClient | null = null;
+let _supabase: ReturnType<typeof createClient> | null = null;
 
-export function getSupabaseServer(): SupabaseClient {
+function getSupabaseServer() {
   if (!_supabase) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -18,8 +18,8 @@ export function getSupabaseServer(): SupabaseClient {
   return _supabase;
 }
 
-// Backward-compatible export (lazy getter)
-export const supabaseServer = new Proxy({} as SupabaseClient, {
+// Lazy proxy so Supabase isn't instantiated at build time
+export const supabaseServer = new Proxy({} as ReturnType<typeof createClient>, {
   get(_, prop) {
     return (getSupabaseServer() as any)[prop];
   }

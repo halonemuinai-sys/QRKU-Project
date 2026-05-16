@@ -4,16 +4,43 @@ import { supabaseServer } from '@/lib/supabase-server';
 import ProfileClient from './ProfileClient';
 
 async function logScan(linkId: string, scanCount: number) {
-  const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
   try {
     const headersList = await headers();
     const userAgent = headersList.get('user-agent') || 'Unknown';
+    
+    const isIOS = /iPhone|iPad|iPod/i.test(userAgent);
+    const isAndroid = /Android/i.test(userAgent);
+    const isMac = /Macintosh/i.test(userAgent);
+    const isWindows = /Windows/i.test(userAgent);
+    const isLinux = /Linux/i.test(userAgent) && !isAndroid;
+    const os = isIOS ? 'iOS' : isAndroid ? 'Android' : isMac ? 'macOS' : isWindows ? 'Windows' : isLinux ? 'Linux' : 'Unknown';
 
-    await fetch(`${BASE_URL}/api/scan`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ linkId, scanCount, userAgent }),
-    });
+    const isChrome = /Chrome/i.test(userAgent) && !/Edg/i.test(userAgent);
+    const isSafari = /Safari/i.test(userAgent) && !/Chrome/i.test(userAgent);
+    const isFirefox = /Firefox/i.test(userAgent);
+    const isEdge = /Edg/i.test(userAgent);
+    const browser = isChrome ? 'Chrome' : isSafari ? 'Safari' : isFirefox ? 'Firefox' : isEdge ? 'Edge' : 'Unknown';
+
+    let ip = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || '8.8.8.8';
+    if (ip.includes(',')) ip = ip.split(',')[0].trim();
+    if (ip === '::1' || ip === '127.0.0.1') ip = '8.8.8.8';
+
+    let geoData = { city: 'Unknown', country: 'Unknown', lat: 0, lon: 0 };
+    try {
+      const geoRes = await fetch(`http://ip-api.com/json/${ip}`, { signal: AbortSignal.timeout(3000) });
+      const geo = await geoRes.json();
+      if (geo.status === 'success') {
+        geoData = { city: geo.city, country: geo.country, lat: geo.lat, lon: geo.lon };
+      }
+    } catch (e) { /* ignore geo error */ }
+
+    await supabaseServer.from('scan_logs').insert([{
+      link_id: linkId, user_agent: userAgent, ip_address: ip,
+      city: geoData.city, country: geoData.country, lat: geoData.lat, lon: geoData.lon,
+      os, browser
+    }]);
+
+    await supabaseServer.from('dynamic_links').update({ scan_count: (scanCount || 0) + 1 }).eq('id', linkId);
   } catch (e) {
     console.error('Scan log failed:', e);
   }

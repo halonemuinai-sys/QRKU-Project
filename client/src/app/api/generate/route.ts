@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
 
     if (error) throw error;
 
-    const dynamicUrl = `${BASE_URL}/v/${shortId}`;
+    const dynamicUrl = `${req.nextUrl.origin}/v/${shortId}`;
     const buffer = await QRCode.toBuffer(dynamicUrl, {
       width: 1000,
       margin: 2,

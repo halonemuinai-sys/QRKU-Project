@@ -379,8 +379,7 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if (activeTab === "qr") generateQR();
-    if (activeTab === "smart") generateSmartQR();
+    // Only fetch analytics and gallery automatically on tab switch
     if (activeTab === "analytics") fetchAnalytics();
     if (activeTab === "gallery") fetchGallery();
   }, [activeTab]);

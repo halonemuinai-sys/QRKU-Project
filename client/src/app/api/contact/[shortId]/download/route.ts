@@ -9,13 +9,14 @@ export async function GET(
 ) {
   try {
     const { shortId } = await params;
-    const { data, error } = await supabaseServer
+    const { data: rawData, error } = await supabaseServer
       .from('dynamic_links')
       .select('*')
       .eq('short_id', shortId)
       .single();
 
-    if (error || !data) return new NextResponse('Contact not found', { status: 404 });
+    if (error || !rawData) return new NextResponse('Contact not found', { status: 404 });
+    const data = rawData as any;
 
     // Build vCard manually (vcards-js uses require which can cause issues)
     const lines = [

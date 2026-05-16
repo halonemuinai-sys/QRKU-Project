@@ -12,7 +12,7 @@ function getSupabaseServer() {
     }
 
     _supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      db: { schema: 'barcode' }
+      db: { schema: 'barcode' } as any
     });
   }
   return _supabase;

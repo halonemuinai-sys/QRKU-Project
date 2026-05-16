@@ -19,7 +19,7 @@ function getSupabaseServer() {
 }
 
 // Lazy proxy so Supabase isn't instantiated at build time
-export const supabaseServer = new Proxy({} as ReturnType<typeof createClient>, {
+export const supabaseServer: any = new Proxy({}, {
   get(_, prop) {
     return (getSupabaseServer() as any)[prop];
   }

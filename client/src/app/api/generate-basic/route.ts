@@ -11,6 +11,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
+      previewOnly,
       editingId,
       data: qrData, type = 'link', rawData, smartTitle,
       dotsColor, dotsType, gradientColor2, cornersSquareType, cornersSquareColor,
@@ -18,6 +19,16 @@ export async function POST(req: NextRequest) {
     } = body;
 
     const userId = req.headers.get('x-user-id');
+
+    if (previewOnly) {
+      const buffer = await QRCode.toBuffer(qrData, {
+        width: 1000, margin: 2,
+        color: { dark: dotsColor || '#000000', light: backgroundColor || '#ffffff' },
+        errorCorrectionLevel: 'H'
+      });
+      return new NextResponse(new Uint8Array(buffer), { headers: { 'Content-Type': 'image/png' } });
+    }
+
     let shortId = nanoid(6);
 
     const payload: any = {

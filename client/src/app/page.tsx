@@ -136,6 +136,8 @@ export default function Home() {
   const [analyticsData, setAnalyticsData] = useState<any>(null);
   const [galleryData, setGalleryData] = useState<any[]>([]);
   const [showMapModal, setShowMapModal] = useState(false);
+  const [gallerySearch, setGallerySearch] = useState("");
+  const [galleryFilter, setGalleryFilter] = useState<"all" | "vcard" | "smart">("all");
 
   const [frameConfig, setFrameConfig] = useState({
     style: "none" as "none" | "rounded" | "badge" | "banner" | "circle",
@@ -164,6 +166,9 @@ export default function Home() {
   const [smartQrImage, setSmartQrImage] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [qrSaved, setQrSaved] = useState(false);
+  const [smartQrSaved, setSmartQrSaved] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -316,37 +321,53 @@ export default function Home() {
 
   const generateQR = async () => {
     setLoading(true);
+    setQrSaved(false);
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-user-id": user?.id || "" },
+        body: JSON.stringify({ ...formData, previewOnly: true }),
+      });
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Server Error (${response.status})`);
+      }
+      const blob = await response.blob();
+      setQrImage(URL.createObjectURL(blob));
+    } catch (error: any) {
+      alert("Gagal preview QR: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveQR = async () => {
+    setSaving(true);
     try {
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-user-id": user?.id || "" },
         body: JSON.stringify({ ...formData, editingId }),
       });
-      
       if (!response.ok) {
-        let errorMessage = "Terjadi kesalahan pada server";
-        try {
-          const errData = await response.json();
-          errorMessage = errData.error || errorMessage;
-        } catch (e) {
-          errorMessage = `Server Error (${response.status})`;
-        }
-        throw new Error(errorMessage);
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Server Error (${response.status})`);
       }
-      
       const blob = await response.blob();
       setQrImage(URL.createObjectURL(blob));
+      setQrSaved(true);
+      setEditingId(null);
       triggerConfetti();
     } catch (error: any) {
-      console.error("QR Generation Error:", error.message);
-      alert("Gagal membuat QR: " + error.message);
+      alert("Gagal menyimpan QR: " + error.message);
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
   const generateSmartQR = async () => {
     setLoading(true);
+    setSmartQrSaved(false);
     try {
       let finalData = "";
       let rawData = {};
@@ -376,35 +397,51 @@ export default function Home() {
       const response = await fetch("/api/generate-basic", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-user-id": user?.id || "" },
-        body: JSON.stringify({
-          data: finalData,
-          type: smartData.type,
-          smartTitle: smartData.title,
-          editingId,
-          rawData,
-          ...formData
-        }),
+        body: JSON.stringify({ data: finalData, type: smartData.type, smartTitle: smartData.title, rawData, previewOnly: true, ...formData }),
       });
-      
       if (!response.ok) {
-        let errorMessage = "Gagal membuat Smart QR";
-        try {
-          const errData = await response.json();
-          errorMessage = errData.error || errorMessage;
-        } catch (e) {
-          errorMessage = `Server Error (${response.status})`;
-        }
-        throw new Error(errorMessage);
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Server Error (${response.status})`);
       }
-      
       const blob = await response.blob();
       setSmartQrImage(URL.createObjectURL(blob));
-      triggerConfetti();
     } catch (error: any) {
-      console.error("Smart QR Error:", error.message);
-      alert("Gagal membuat Smart QR: " + error.message);
+      alert("Gagal preview Smart QR: " + error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveSmartQR = async () => {
+    setSaving(true);
+    try {
+      let finalData = "";
+      let rawData = {};
+      if (smartData.type === 'link') { finalData = smartData.url; rawData = { content: smartData.url }; }
+      else if (smartData.type === 'wifi') { finalData = `WIFI:S:${smartData.ssid};T:${smartData.encryption};P:${smartData.password};;`; rawData = { ssid: smartData.ssid, password: smartData.password, encryption: smartData.encryption }; }
+      else if (smartData.type === 'maps') { finalData = `https://www.google.com/maps/search/?api=1&query=${smartData.lat},${smartData.lon}`; rawData = { lat: smartData.lat, lon: smartData.lon }; }
+      else if (smartData.type === 'whatsapp') { const n = smartData.waNumber.replace(/[^0-9+]/g, ''); finalData = `https://wa.me/${n}?text=${encodeURIComponent(smartData.waMessage)}`; rawData = { waNumber: smartData.waNumber, waMessage: smartData.waMessage }; }
+      else if (smartData.type === 'instagram') { const u = smartData.igUsername.replace('@', '').trim(); finalData = `https://instagram.com/${u}`; rawData = { igUsername: smartData.igUsername }; }
+      else if (smartData.type === 'tiktok') { const u = smartData.ttUsername.replace('@', '').trim(); finalData = `https://tiktok.com/@${u}`; rawData = { ttUsername: smartData.ttUsername }; }
+
+      const response = await fetch("/api/generate-basic", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-user-id": user?.id || "" },
+        body: JSON.stringify({ data: finalData, type: smartData.type, smartTitle: smartData.title, editingId, rawData, ...formData }),
+      });
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Server Error (${response.status})`);
+      }
+      const blob = await response.blob();
+      setSmartQrImage(URL.createObjectURL(blob));
+      setSmartQrSaved(true);
+      setEditingId(null);
+      triggerConfetti();
+    } catch (error: any) {
+      alert("Gagal menyimpan Smart QR: " + error.message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -506,17 +543,38 @@ export default function Home() {
                 </section>
                 <StyleSection formData={formData} handleInputChange={handleInputChange} uploading={uploading} fileInputRef={fileInputRef} handleFileUpload={handleFileUpload} defaultLogos={defaultLogos} setFormData={setFormData} />
               </div>
-              <div className="lg:col-span-5"><PreviewSection title="vCard Siap! 🚀" qrImage={qrImage} loading={loading} onGenerate={generateQR} buttonText={editingId ? "Update vCard QR!" : "Simpan & Bikin QR!"} onCancelEdit={editingId ? cancelEdit : undefined} frameConfig={frameConfig} setFrameConfig={setFrameConfig} /></div>
+              <div className="lg:col-span-5"><PreviewSection title="vCard QR" qrImage={qrImage} loading={loading} saving={saving} onGenerate={generateQR} onSave={saveQR} saved={qrSaved} saveButtonText={editingId ? "Update ke Gallery" : "Simpan ke Gallery"} onCancelEdit={editingId ? cancelEdit : undefined} frameConfig={frameConfig} setFrameConfig={setFrameConfig} /></div>
             </motion.div>
           ) : activeTab === "smart" ? (
             <motion.div key="smart-tab" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="grid grid-cols-1 lg:grid-cols-12 gap-10">
               <div className="lg:col-span-7 space-y-10">
                 <section className="bg-white border-[4px] border-black shadow-[10px_10px_0px_0px_#000] rounded-[2.5rem] p-10">
                   <div className="flex items-center gap-4 mb-10"><div className="w-12 h-12 bg-[#4caf50] border-[3px] border-black rounded-2xl flex items-center justify-center text-white"><Zap size={24} /></div><h2 className="text-3xl font-[900] uppercase text-black italic">Smart QR Tools</h2></div>
-                  <div className="flex flex-wrap gap-4 mb-10">
-                    {[{ id: 'link', name: 'Link', icon: <LinkIcon /> }, { id: 'wifi', name: 'WiFi', icon: <Wifi /> }, { id: 'maps', name: 'Maps', icon: <MapPin /> }, { id: 'whatsapp', name: 'WhatsApp', icon: <MessageSquare /> }, { id: 'instagram', name: 'Instagram', icon: <Camera /> }, { id: 'tiktok', name: 'TikTok', icon: <Play /> }].map(type => (
-                      <button key={type.id} onClick={() => setSmartData({...smartData, type: type.id as any})} className={`flex-1 md:flex-none px-6 py-3 rounded-xl border-[3px] border-black font-black uppercase flex items-center justify-center gap-2 transition-all ${smartData.type === type.id ? "bg-[#ffeb3b] shadow-[4px_4px_0px_0px_#000] translate-x-[-2px] translate-y-[-2px]" : "bg-white hover:bg-gray-50 shadow-[2px_2px_0px_0px_#000]"}`}>{type.icon}{type.name}</button>
-                    ))}
+                  <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-10">
+                    {[
+                      { id: 'link', name: 'Link', icon: <LinkIcon size={22}/>, color: '#2196f3' },
+                      { id: 'wifi', name: 'WiFi', icon: <Wifi size={22}/>, color: '#4caf50' },
+                      { id: 'maps', name: 'Maps', icon: <MapPin size={22}/>, color: '#f44336' },
+                      { id: 'whatsapp', name: 'WA', icon: <MessageSquare size={22}/>, color: '#25D366' },
+                      { id: 'instagram', name: 'IG', icon: <Camera size={22}/>, color: '#E4405F' },
+                      { id: 'tiktok', name: 'TikTok', icon: <Play size={22}/>, color: '#000000' },
+                    ].map(type => {
+                      const isActive = smartData.type === type.id;
+                      return (
+                        <button
+                          type="button"
+                          key={type.id}
+                          onClick={() => setSmartData({...smartData, type: type.id as any})}
+                          className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-[3px] border-black font-black uppercase text-xs transition-all ${isActive ? "shadow-[4px_4px_0px_0px_#000] -translate-x-[2px] -translate-y-[2px] text-white" : "bg-white hover:bg-gray-50 shadow-[2px_2px_0px_0px_#000] text-black"}`}
+                          style={isActive ? { backgroundColor: type.color } : {}}
+                        >
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center border-2 border-black text-white`} style={{ backgroundColor: type.color }}>
+                            {type.icon}
+                          </div>
+                          {type.name}
+                        </button>
+                      );
+                    })}
                   </div>
                   <div className="space-y-8">
                     <div className="bg-[#ffeb3b] border-[3px] border-black rounded-2xl p-6 shadow-[4px_4px_0px_0px_#000]">
@@ -559,7 +617,7 @@ export default function Home() {
                 </section>
                 <StyleSection formData={formData} handleInputChange={handleInputChange} uploading={uploading} fileInputRef={fileInputRef} handleFileUpload={handleFileUpload} defaultLogos={defaultLogos} setFormData={setFormData} />
               </div>
-              <div className="lg:col-span-5"><PreviewSection title="Smart QR Siap! 🚀" qrImage={smartQrImage} loading={loading} onGenerate={generateSmartQR} buttonText={editingId ? `Update QR ${smartData.type}!` : `Simpan & Bikin QR ${smartData.type}!`} onCancelEdit={editingId ? cancelEdit : undefined} frameConfig={frameConfig} setFrameConfig={setFrameConfig} /></div>
+              <div className="lg:col-span-5"><PreviewSection title="Smart QR" qrImage={smartQrImage} loading={loading} saving={saving} onGenerate={generateSmartQR} onSave={saveSmartQR} saved={smartQrSaved} saveButtonText={editingId ? `Update ke Gallery` : `Simpan ke Gallery`} onCancelEdit={editingId ? cancelEdit : undefined} frameConfig={frameConfig} setFrameConfig={setFrameConfig} /></div>
             </motion.div>
           ) : activeTab === "analytics" ? (
             <motion.div key="analytics-tab" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-10">
@@ -680,57 +738,106 @@ export default function Home() {
             </motion.div>
           ) : activeTab === "gallery" ? (
             <motion.div key="gallery-tab" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
-              <div className="flex justify-between items-center bg-white border-[4px] border-black rounded-[2rem] p-6 shadow-[8px_8px_0px_0px_#000]">
-                <div>
-                  <h3 className="text-2xl font-black uppercase italic flex items-center gap-3"><History /> Riwayat QR</h3>
-                  <p className="text-xs font-bold text-gray-400 uppercase">Total {galleryData.length} QR tersimpan</p>
+              {/* Header */}
+              <div className="bg-white border-[4px] border-black rounded-[2rem] p-6 shadow-[8px_8px_0px_0px_#000] space-y-5">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-2xl font-black uppercase italic flex items-center gap-3"><History /> My Gallery</h3>
+                    <p className="text-xs font-bold text-gray-400 uppercase mt-1">{galleryData.length} QR Tersimpan</p>
+                  </div>
+                  {galleryData.length > 0 && (
+                    <button type="button" onClick={deleteAllQRs} className="bg-red-500 text-white border-[3px] border-black px-5 py-2.5 rounded-2xl font-black uppercase text-sm shadow-[4px_4px_0px_0px_#000] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all flex items-center gap-2">
+                      <Trash2 size={16} /> Hapus Semua
+                    </button>
+                  )}
                 </div>
-                {galleryData.length > 0 && (
-                  <button onClick={deleteAllQRs} className="bg-red-500 text-white border-[3px] border-black px-6 py-3 rounded-2xl font-black uppercase italic text-sm shadow-[4px_4px_0px_0px_#000] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all flex items-center gap-2" title="Hapus Semua QR">
-                    <Trash2 size={18} /> Delete All
-                  </button>
-                )}
+                {/* Search + Filter */}
+                <div className="flex flex-col md:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"><QrCode size={18}/></div>
+                    <input
+                      type="text"
+                      placeholder="Cari QR..."
+                      value={gallerySearch}
+                      onChange={e => setGallerySearch(e.target.value)}
+                      className="w-full bg-white border-[3px] border-black rounded-2xl pl-11 pr-5 py-3 font-bold text-sm shadow-[3px_3px_0px_0px_#000] outline-none placeholder:text-gray-300"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    {(["all", "vcard", "smart"] as const).map(f => (
+                      <button type="button" key={f} onClick={() => setGalleryFilter(f)}
+                        className={`px-5 py-3 rounded-2xl border-[3px] border-black font-black uppercase text-xs transition-all ${galleryFilter === f ? "bg-black text-white shadow-[3px_3px_0px_0px_#000] -translate-x-[1px] -translate-y-[1px]" : "bg-white hover:bg-gray-50 shadow-[2px_2px_0px_0px_#000]"}`}>
+                        {f === "all" ? "Semua" : f === "vcard" ? "vCard" : "Smart"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div className="flex flex-col gap-5">
-                {galleryData.length > 0 ? galleryData.map((item) => (
-                <motion.div whileHover={{ scale: 1.01 }} key={item.id} className="bg-white border-[4px] border-black rounded-[2rem] shadow-[6px_6px_0px_0px_#000] p-6 flex flex-col md:flex-row items-center justify-between gap-6 transition-all hover:bg-gray-50">
-                  
-                  <div className="flex items-center gap-5 flex-1 w-full">
-                    {/* Minimalist Icon */}
-                    <div className={`border-[3px] border-black rounded-2xl p-4 flex-shrink-0 ${item.type === 'vcard' ? 'bg-[#ffeb3b]' : 'bg-[#4caf50]'}`}>
-                      <QrCode size={36} className={item.type === 'vcard' ? 'text-black' : 'text-white'} />
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-1">
-                        <div className={`px-2 py-0.5 rounded-full border-2 border-black font-black text-[10px] uppercase ${item.type === 'vcard' ? 'bg-[#ffeb3b]' : 'bg-black text-white'}`}>{item.type || 'UNKNOWN'}</div>
-                        <p className="text-xs font-bold text-gray-500 italic">{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                      </div>
-                      <h3 className="text-lg font-black uppercase truncate leading-tight mb-1">
-                        {item.type === 'vcard' 
-                          ? `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'VCARD'
-                          : item.first_name || String(item.type || 'UNKNOWN').toUpperCase()}
-                      </h3>
-                      <div className="inline-block bg-black text-white px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider">{item.scan_count} Scan Terkumpul</div>
-                    </div>
-                  </div>
 
-                  <div className="flex gap-2 w-full md:w-auto">
-                    <button onClick={() => { setActiveTab(item.type === 'vcard' ? 'qr' : 'smart'); restoreQR(item); }} title="Buka & Edit" className="flex-1 md:flex-none bg-white border-[3px] border-black px-5 py-2.5 rounded-xl font-black text-sm shadow-[3px_3px_0px_0px_#000] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all flex items-center justify-center gap-2">
-                      <ExternalLink size={16}/> Buka
-                    </button>
-                    <button onClick={() => deleteQR(item.id)} className="px-4 py-2.5 border-[3px] border-black rounded-xl bg-red-400 hover:bg-red-500 text-white shadow-[3px_3px_0px_0px_#000] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all flex items-center justify-center" title="Hapus QR">
-                      <Trash2 size={16}/>
-                    </button>
-                  </div>
-                </motion.div>
-              )) : (
-                <div className="col-span-full py-20 text-center">
-                  <div className="w-20 h-20 bg-gray-100 rounded-full border-2 border-black flex items-center justify-center mx-auto mb-6 opacity-30"><History size={40}/></div>
-                  <h3 className="text-2xl font-black uppercase text-gray-300">Belum ada QR yang disimpan</h3>
-                  <p className="font-bold text-gray-300">Buat QR pertamamu untuk melihatnya di sini!</p>
-                </div>
-                )}
+              {/* Gallery List */}
+              <div className="flex flex-col gap-4">
+                {(() => {
+                  const filtered = galleryData.filter(item => {
+                    const matchFilter = galleryFilter === "all" || (galleryFilter === "vcard" && item.type === "vcard") || (galleryFilter === "smart" && item.type !== "vcard");
+                    const name = item.type === "vcard" ? `${item.first_name || ""} ${item.last_name || ""}`.trim() : item.first_name || item.type || "";
+                    const matchSearch = !gallerySearch || name.toLowerCase().includes(gallerySearch.toLowerCase());
+                    return matchFilter && matchSearch;
+                  });
+
+                  if (filtered.length === 0) return (
+                    <div className="py-24 text-center">
+                      <div className="w-20 h-20 bg-gray-100 rounded-full border-2 border-black flex items-center justify-center mx-auto mb-6 opacity-30"><History size={40}/></div>
+                      <h3 className="text-2xl font-black uppercase text-gray-300">{galleryData.length === 0 ? "Belum ada QR yang disimpan" : "Tidak ada hasil"}</h3>
+                      <p className="font-bold text-gray-300 mt-2">{galleryData.length === 0 ? "Buat QR pertamamu untuk melihatnya di sini!" : "Coba ubah filter atau kata kunci pencarian."}</p>
+                    </div>
+                  );
+
+                  return filtered.map((item) => {
+                    const name = item.type === "vcard"
+                      ? `${item.first_name || ""} ${item.last_name || ""}`.trim() || "vCard"
+                      : item.first_name || String(item.type || "UNKNOWN").toUpperCase();
+                    const isVcard = item.type === "vcard";
+                    const typeColors: Record<string, string> = { link: "#2196f3", wifi: "#4caf50", maps: "#f44336", whatsapp: "#25D366", instagram: "#E4405F", tiktok: "#000000", vcard: "#ffeb3b" };
+                    const typeColor = typeColors[item.type] || "#888";
+                    const typeLabel = item.type?.toUpperCase() || "QR";
+
+                    return (
+                      <motion.div whileHover={{ scale: 1.005 }} key={item.id}
+                        className="bg-white border-[4px] border-black rounded-[2rem] shadow-[6px_6px_0px_0px_#000] p-5 flex flex-col md:flex-row items-center gap-5 transition-all">
+
+                        {/* QR Thumbnail */}
+                        <div className="flex-shrink-0 border-[3px] border-black rounded-2xl overflow-hidden bg-white p-2 shadow-[4px_4px_0px_0px_#000]">
+                          <QRThumbnail item={item} size={80} />
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0 w-full">
+                          <div className="flex items-center gap-2 mb-2 flex-wrap">
+                            <span className="px-2.5 py-1 rounded-full border-2 border-black font-black text-[10px] uppercase tracking-wider text-white" style={{ backgroundColor: typeColor }}>{typeLabel}</span>
+                            <span className="text-xs font-bold text-gray-400 italic">{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                          </div>
+                          <h3 className="text-xl font-black uppercase truncate leading-tight">{name}</h3>
+                          {isVcard && item.organization && <p className="text-xs font-bold text-gray-500 truncate mt-0.5">{item.organization} {item.position ? `· ${item.position}` : ""}</p>}
+                          {!isVcard && item.raw_data?.content && <p className="text-xs font-bold text-gray-500 truncate mt-0.5">{item.raw_data.content}</p>}
+                          <div className="flex items-center gap-3 mt-2">
+                            <span className="bg-black text-white px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1"><TrendingUp size={10}/>{item.scan_count} Scan</span>
+                            {item.short_id && <span className="bg-gray-100 border border-gray-200 text-gray-500 px-2 py-1 rounded-lg text-[10px] font-bold uppercase">{item.short_id}</span>}
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex md:flex-col gap-2 w-full md:w-auto">
+                          <button type="button" onClick={() => { setActiveTab(isVcard ? "qr" : "smart"); restoreQR(item); }} className="flex-1 md:flex-none bg-[#ffeb3b] border-[3px] border-black px-5 py-3 rounded-xl font-black text-sm shadow-[3px_3px_0px_0px_#000] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all flex items-center justify-center gap-2">
+                            <Edit3 size={15}/> Edit
+                          </button>
+                          <button type="button" onClick={() => deleteQR(item.id)} className="flex-1 md:flex-none px-5 py-3 border-[3px] border-black rounded-xl bg-red-100 hover:bg-red-200 text-red-700 shadow-[3px_3px_0px_0px_#000] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all flex items-center justify-center gap-2 font-black text-sm">
+                            <Trash2 size={15}/> Hapus
+                          </button>
+                        </div>
+                      </motion.div>
+                    );
+                  });
+                })()}
               </div>
             </motion.div>
           ) : (
@@ -851,7 +958,7 @@ function StyleSection({ formData, handleInputChange, uploading, fileInputRef, ha
   );
 }
 
-function PreviewSection({ title, qrImage, loading, onGenerate, buttonText, onCancelEdit, frameConfig, setFrameConfig }: any) {
+function PreviewSection({ title, qrImage, loading, saving, onGenerate, onSave, saved, saveButtonText, onCancelEdit, frameConfig, setFrameConfig }: any) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const labelPresets = ["SCAN ME", "FOLLOW US", "CONNECT WITH ME", "ORDER NOW", "VISIT US", "SAVE CONTACT"];
   const frameStyles = [
@@ -1102,18 +1209,50 @@ function PreviewSection({ title, qrImage, loading, onGenerate, buttonText, onCan
           )}
         </div>
 
-        <div className="mt-8 flex flex-col gap-6 w-full">
+        <div className="mt-8 flex flex-col gap-4 w-full">
           {onCancelEdit && (
-            <button onClick={onCancelEdit} className="w-full bg-[#f44336] text-white border-[4px] border-black py-4 rounded-[1.5rem] font-[900] text-xl shadow-[6px_6px_0px_0px_#000] hover:shadow-none hover:translate-x-[4px] hover:translate-y-[4px] transition-all flex items-center justify-center gap-3 uppercase">
-              <X size={24} /> Batal Edit (Buat Baru)
+            <button type="button" onClick={onCancelEdit} className="w-full bg-[#f44336] text-white border-[4px] border-black py-4 rounded-[1.5rem] font-[900] text-lg shadow-[6px_6px_0px_0px_#000] hover:shadow-none hover:translate-x-[4px] hover:translate-y-[4px] transition-all flex items-center justify-center gap-3 uppercase">
+              <X size={22} /> Batal Edit
             </button>
           )}
-          <button onClick={onGenerate} disabled={loading} className={`w-full border-[4px] border-black py-6 rounded-[2rem] font-[900] text-2xl shadow-[8px_8px_0px_0px_#000] hover:shadow-none hover:translate-x-[5px] hover:translate-y-[5px] transition-all flex items-center justify-center gap-4 uppercase ${loading ? 'bg-gray-300 cursor-wait' : 'bg-[#ffeb3b]'}`}>{loading ? <><Sparkles size={28} className="animate-spin" /> Sedang Mencetak...</> : <><RefreshCw size={28} /> {buttonText}</>}</button>
+
+          {/* Step 1: Preview */}
+          <button type="button" onClick={onGenerate} disabled={loading || saving} className={`w-full border-[4px] border-black py-5 rounded-[2rem] font-[900] text-xl shadow-[8px_8px_0px_0px_#000] hover:shadow-none hover:translate-x-[5px] hover:translate-y-[5px] transition-all flex items-center justify-center gap-4 uppercase ${loading ? 'bg-gray-300 cursor-wait' : 'bg-[#ffeb3b]'}`}>
+            {loading ? <><Sparkles size={26} className="animate-spin" /> Memproses...</> : <><RefreshCw size={26} /> Preview QR</>}
+          </button>
+
+          {/* Step 2: Save — shown after preview, collapses when saved */}
+          <AnimatePresence>
+            {qrImage && !saved && (
+              <motion.button
+                type="button"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                onClick={onSave}
+                disabled={saving || loading}
+                className={`w-full border-[4px] border-black py-5 rounded-[2rem] font-[900] text-xl shadow-[8px_8px_0px_0px_#000] hover:shadow-none hover:translate-x-[5px] hover:translate-y-[5px] transition-all flex items-center justify-center gap-4 uppercase text-white ${saving ? 'bg-gray-400 cursor-wait' : 'bg-[#2196f3]'}`}
+              >
+                {saving ? <><Sparkles size={26} className="animate-spin" /> Menyimpan...</> : <><Star size={26} /> {saveButtonText}</>}
+              </motion.button>
+            )}
+            {qrImage && saved && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="w-full bg-[#4caf50] text-white border-[4px] border-black py-4 rounded-[2rem] font-[900] text-lg flex items-center justify-center gap-3 uppercase shadow-[4px_4px_0px_0px_#000]"
+              >
+                <CheckCircle2 size={24} /> Tersimpan di Gallery!
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Download buttons */}
           {qrImage && (
-            <div className="flex gap-4">
-              <a href={qrImage} download="BikinQR.png" className="flex-1 bg-[#2196f3] text-white border-[4px] border-black py-5 rounded-[2rem] font-[900] text-lg shadow-[6px_6px_0px_0px_#000] hover:shadow-none hover:translate-x-[3px] hover:translate-y-[3px] transition-all flex items-center justify-center gap-3 uppercase"><Download size={24} /> QR Only</a>
+            <div className="flex gap-3">
+              <a href={qrImage} download="BikinQR.png" className="flex-1 bg-white border-[3px] border-black py-4 rounded-[1.5rem] font-[900] text-sm shadow-[4px_4px_0px_0px_#000] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all flex items-center justify-center gap-2 uppercase"><Download size={20} /> Unduh QR</a>
               {frameConfig.style !== "none" && (
-                <button onClick={downloadFramedQR} className="flex-1 bg-[#4caf50] text-white border-[4px] border-black py-5 rounded-[2rem] font-[900] text-lg shadow-[6px_6px_0px_0px_#000] hover:shadow-none hover:translate-x-[3px] hover:translate-y-[3px] transition-all flex items-center justify-center gap-3 uppercase"><Download size={24} /> + Frame</button>
+                <button type="button" onClick={downloadFramedQR} className="flex-1 bg-white border-[3px] border-black py-4 rounded-[1.5rem] font-[900] text-sm shadow-[4px_4px_0px_0px_#000] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all flex items-center justify-center gap-2 uppercase"><Download size={20} /> + Frame</button>
               )}
             </div>
           )}
@@ -1121,6 +1260,44 @@ function PreviewSection({ title, qrImage, loading, onGenerate, buttonText, onCan
       </motion.div>
     </div>
   );
+}
+
+function QRThumbnail({ item, size = 80 }: { item: any; size?: number }) {
+  const [url, setUrl] = useState<string>("");
+
+  useEffect(() => {
+    let content = "";
+    const t = item.type;
+    if (t === "vcard") {
+      content = typeof window !== "undefined" ? `${window.location.origin}/v/${item.short_id}` : `/v/${item.short_id}`;
+    } else if (t === "link") {
+      content = item.raw_data?.content || "";
+    } else if (t === "wifi") {
+      content = `WIFI:S:${item.raw_data?.ssid};T:${item.raw_data?.encryption || "WPA"};P:${item.raw_data?.password};;`;
+    } else if (t === "maps") {
+      content = `https://www.google.com/maps/search/?api=1&query=${item.raw_data?.lat},${item.raw_data?.lon}`;
+    } else if (t === "whatsapp") {
+      content = `https://wa.me/${(item.raw_data?.waNumber || "").replace(/[^0-9+]/g, "")}`;
+    } else if (t === "instagram") {
+      content = `https://instagram.com/${(item.raw_data?.igUsername || "").replace("@", "")}`;
+    } else if (t === "tiktok") {
+      content = `https://tiktok.com/@${(item.raw_data?.ttUsername || "").replace("@", "")}`;
+    }
+    if (!content) return;
+    import("qrcode").then((mod) => {
+      const QRCode = mod.default ?? mod;
+      (QRCode as any).toDataURL(content, { width: size, margin: 1, errorCorrectionLevel: "M" })
+        .then((dataUrl: string) => setUrl(dataUrl))
+        .catch(() => {});
+    });
+  }, [item, size]);
+
+  if (!url) return (
+    <div className="rounded-lg bg-gray-100 animate-pulse flex items-center justify-center" style={{ width: size, height: size }}>
+      <QrCode size={size / 3} className="text-gray-300" />
+    </div>
+  );
+  return <img src={url} alt="QR Preview" width={size} height={size} className="rounded-lg" />;
 }
 
 function CartoonInput({ id, label, name, value, onChange, icon, className = "", placeholder = "" }: any) {

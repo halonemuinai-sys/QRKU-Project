@@ -574,30 +574,33 @@ export default function Home() {
                   </button>
                 )}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              <div className="flex flex-col gap-5">
                 {galleryData.length > 0 ? galleryData.map((item) => (
-                <motion.div whileHover={{ scale: 1.02 }} key={item.id} className="bg-white border-[4px] border-black rounded-[2.5rem] shadow-[8px_8px_0px_0px_#000] p-8 flex flex-col justify-between">
-                  <div>
-                    <div className="flex justify-between items-start mb-4">
-                      <div className={`px-4 py-1 rounded-full border-2 border-black font-black text-xs uppercase ${item.type === 'vcard' ? 'bg-[#ffeb3b]' : 'bg-[#4caf50] text-white'}`}>{item.type || 'UNKNOWN'}</div>
-                      <div className="flex gap-2">
-                        <button onClick={() => restoreQR(item)} className="p-2 border-2 border-black rounded-lg bg-blue-100 hover:bg-blue-200" title="Edit Data QR"><Edit3 size={18}/></button>
-                        <button onClick={() => deleteQR(item.id)} className="p-2 border-2 border-black rounded-lg bg-red-100 hover:bg-red-200" title="Hapus QR dari Galeri"><Trash2 size={18}/></button>
-                      </div>
+                <motion.div whileHover={{ scale: 1.01 }} key={item.id} className="bg-white border-[4px] border-black rounded-[2rem] shadow-[6px_6px_0px_0px_#000] p-6 flex flex-col md:flex-row items-center justify-between gap-6 transition-all hover:bg-gray-50">
+                  
+                  <div className="flex items-center gap-5 flex-1 w-full">
+                    {/* Minimalist Icon */}
+                    <div className={`border-[3px] border-black rounded-2xl p-4 flex-shrink-0 ${item.type === 'vcard' ? 'bg-[#ffeb3b]' : 'bg-[#4caf50]'}`}>
+                      <QrCode size={36} className={item.type === 'vcard' ? 'text-black' : 'text-white'} />
                     </div>
-                    <h3 className="text-xl font-black uppercase mb-1">{item.type === 'vcard' ? `${item.first_name} ${item.last_name || ''}` : String(item.type || 'UNKNOWN').toUpperCase()}</h3>
-                    <p className="text-xs font-bold text-gray-500 italic mb-4">{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-
-                    <div className="bg-gray-50 border-2 border-black rounded-2xl p-4 flex items-center justify-center aspect-square mb-6 relative">
-                      <QrCode size={120} className="opacity-20" />
-                      <div className="absolute font-black text-xs uppercase opacity-30 tracking-widest">Preview QR</div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-1">
+                        <div className={`px-2 py-0.5 rounded-full border-2 border-black font-black text-[10px] uppercase ${item.type === 'vcard' ? 'bg-[#ffeb3b]' : 'bg-black text-white'}`}>{item.type || 'UNKNOWN'}</div>
+                        <p className="text-xs font-bold text-gray-500 italic">{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                      </div>
+                      <h3 className="text-lg font-black uppercase truncate leading-tight mb-1">{item.type === 'vcard' ? `${item.first_name} ${item.last_name || ''}` : String(item.type || 'UNKNOWN').toUpperCase()}</h3>
+                      <div className="inline-block bg-black text-white px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider">{item.scan_count} Scan Terkumpul</div>
                     </div>
                   </div>
-                  <div className="flex gap-3">
-                    <button onClick={() => { setActiveTab(item.type === 'vcard' ? 'qr' : 'smart'); restoreQR(item); }} title="Buka QR" className="flex-1 bg-[#ffeb3b] border-2 border-black py-2 rounded-xl font-black text-sm shadow-[4px_4px_0px_0px_#000] hover:shadow-none translate-x-0 hover:translate-x-[2px] hover:translate-y-[2px] transition-all flex items-center justify-center gap-2">
+
+                  <div className="flex gap-2 w-full md:w-auto">
+                    <button onClick={() => { setActiveTab(item.type === 'vcard' ? 'qr' : 'smart'); restoreQR(item); }} title="Buka & Edit" className="flex-1 md:flex-none bg-white border-[3px] border-black px-5 py-2.5 rounded-xl font-black text-sm shadow-[3px_3px_0px_0px_#000] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all flex items-center justify-center gap-2">
                       <ExternalLink size={16}/> Buka
                     </button>
-                    <div className="bg-black text-white px-4 py-2 rounded-xl font-black text-xs flex items-center justify-center">{item.scan_count} SCAN</div>
+                    <button onClick={() => deleteQR(item.id)} className="px-4 py-2.5 border-[3px] border-black rounded-xl bg-red-400 hover:bg-red-500 text-white shadow-[3px_3px_0px_0px_#000] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all flex items-center justify-center" title="Hapus QR">
+                      <Trash2 size={16}/>
+                    </button>
                   </div>
                 </motion.div>
               )) : (

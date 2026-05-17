@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
-      data: qrData, type = 'link', rawData,
+      data: qrData, type = 'link', rawData, smartTitle,
       dotsColor, dotsType, gradientColor2, cornersSquareType, cornersSquareColor,
       cornersDotType, cornersDotColor, backgroundColor, logoUrl, hideBackgroundDots
     } = body;
@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
       .insert([{
         short_id: shortId,
         type,
+        first_name: smartTitle || null,
         user_id: userId || null,
         raw_data: rawData || { content: qrData },
         dots_color: dotsColor,

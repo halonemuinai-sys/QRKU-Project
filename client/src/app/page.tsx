@@ -111,6 +111,7 @@ export default function Home() {
   });
 
   const [smartData, setSmartData] = useState({
+    title: "",
     type: "link" as "link" | "wifi" | "maps" | "whatsapp" | "instagram" | "tiktok",
     url: "https://google.com",
     ssid: "Rumah Lucu",
@@ -263,6 +264,7 @@ export default function Home() {
       setActiveTab("qr");
     } else {
       setSmartData({
+        title: item.first_name || "",
         type: item.type,
         url: item.raw_data?.content || "",
         ssid: item.raw_data?.ssid || "",
@@ -368,6 +370,7 @@ export default function Home() {
         body: JSON.stringify({
           data: finalData,
           type: smartData.type,
+          smartTitle: smartData.title,
           rawData,
           ...formData
         }),
@@ -506,6 +509,17 @@ export default function Home() {
                     ))}
                   </div>
                   <div className="space-y-8">
+                    <div className="bg-[#ffeb3b] border-[3px] border-black rounded-2xl p-6 shadow-[4px_4px_0px_0px_#000]">
+                      <CartoonInput 
+                        id="smartTitle" 
+                        label="Judul QR (Biar rapi di Gallery)" 
+                        name="title" 
+                        value={smartData.title} 
+                        onChange={handleSmartInputChange} 
+                        icon={<Edit3 size={20} className="text-black" />} 
+                        placeholder="Contoh: WA Toko Pusat, WiFi Rumah..." 
+                      />
+                    </div>
                     {smartData.type === 'link' && <CartoonInput id="url" label="Link Website" name="url" value={smartData.url} onChange={handleSmartInputChange} icon={<LinkIcon size={20} className="text-blue-500" />} />}
                     {smartData.type === 'wifi' && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -682,7 +696,11 @@ export default function Home() {
                         <div className={`px-2 py-0.5 rounded-full border-2 border-black font-black text-[10px] uppercase ${item.type === 'vcard' ? 'bg-[#ffeb3b]' : 'bg-black text-white'}`}>{item.type || 'UNKNOWN'}</div>
                         <p className="text-xs font-bold text-gray-500 italic">{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                       </div>
-                      <h3 className="text-lg font-black uppercase truncate leading-tight mb-1">{item.type === 'vcard' ? `${item.first_name} ${item.last_name || ''}` : String(item.type || 'UNKNOWN').toUpperCase()}</h3>
+                      <h3 className="text-lg font-black uppercase truncate leading-tight mb-1">
+                        {item.type === 'vcard' 
+                          ? `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'VCARD'
+                          : item.first_name || String(item.type || 'UNKNOWN').toUpperCase()}
+                      </h3>
                       <div className="inline-block bg-black text-white px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider">{item.scan_count} Scan Terkumpul</div>
                     </div>
                   </div>

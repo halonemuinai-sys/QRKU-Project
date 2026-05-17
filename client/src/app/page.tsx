@@ -110,6 +110,14 @@ export default function Home() {
     hideBackgroundDots: true
   });
 
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setQrImage("");
+    setSmartQrImage("");
+  };
+
   const [smartData, setSmartData] = useState({
     title: "",
     type: "link" as "link" | "wifi" | "maps" | "whatsapp" | "instagram" | "tiktok",
@@ -241,6 +249,7 @@ export default function Home() {
   };
 
   const restoreQR = (item: any) => {
+    setEditingId(item.id);
     if (item.type === 'vcard') {
       setFormData({
         firstName: item.first_name,
@@ -311,7 +320,7 @@ export default function Home() {
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-user-id": user?.id || "" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, editingId }),
       });
       
       if (!response.ok) {
@@ -371,6 +380,7 @@ export default function Home() {
           data: finalData,
           type: smartData.type,
           smartTitle: smartData.title,
+          editingId,
           rawData,
           ...formData
         }),
@@ -496,7 +506,7 @@ export default function Home() {
                 </section>
                 <StyleSection formData={formData} handleInputChange={handleInputChange} uploading={uploading} fileInputRef={fileInputRef} handleFileUpload={handleFileUpload} defaultLogos={defaultLogos} setFormData={setFormData} />
               </div>
-              <div className="lg:col-span-5"><PreviewSection title="vCard Siap! 👑" qrImage={qrImage} loading={loading} onGenerate={generateQR} buttonText="Update vCard" frameConfig={frameConfig} setFrameConfig={setFrameConfig} /></div>
+              <div className="lg:col-span-5"><PreviewSection title="vCard Siap! 🚀" qrImage={qrImage} loading={loading} onGenerate={generateQR} buttonText={editingId ? "Update vCard QR!" : "Simpan & Bikin QR!"} onCancelEdit={editingId ? cancelEdit : undefined} frameConfig={frameConfig} setFrameConfig={setFrameConfig} /></div>
             </motion.div>
           ) : activeTab === "smart" ? (
             <motion.div key="smart-tab" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="grid grid-cols-1 lg:grid-cols-12 gap-10">
@@ -549,7 +559,7 @@ export default function Home() {
                 </section>
                 <StyleSection formData={formData} handleInputChange={handleInputChange} uploading={uploading} fileInputRef={fileInputRef} handleFileUpload={handleFileUpload} defaultLogos={defaultLogos} setFormData={setFormData} />
               </div>
-              <div className="lg:col-span-5"><PreviewSection title="Smart QR Siap! 🚀" qrImage={smartQrImage} loading={loading} onGenerate={generateSmartQR} buttonText={`Simpan & Bikin QR ${smartData.type}!`} frameConfig={frameConfig} setFrameConfig={setFrameConfig} /></div>
+              <div className="lg:col-span-5"><PreviewSection title="Smart QR Siap! 🚀" qrImage={smartQrImage} loading={loading} onGenerate={generateSmartQR} buttonText={editingId ? `Update QR ${smartData.type}!` : `Simpan & Bikin QR ${smartData.type}!`} onCancelEdit={editingId ? cancelEdit : undefined} frameConfig={frameConfig} setFrameConfig={setFrameConfig} /></div>
             </motion.div>
           ) : activeTab === "analytics" ? (
             <motion.div key="analytics-tab" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-10">
@@ -841,7 +851,7 @@ function StyleSection({ formData, handleInputChange, uploading, fileInputRef, ha
   );
 }
 
-function PreviewSection({ title, qrImage, loading, onGenerate, buttonText, frameConfig, setFrameConfig }: any) {
+function PreviewSection({ title, qrImage, loading, onGenerate, buttonText, onCancelEdit, frameConfig, setFrameConfig }: any) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const labelPresets = ["SCAN ME", "FOLLOW US", "CONNECT WITH ME", "ORDER NOW", "VISIT US", "SAVE CONTACT"];
   const frameStyles = [
@@ -1093,6 +1103,11 @@ function PreviewSection({ title, qrImage, loading, onGenerate, buttonText, frame
         </div>
 
         <div className="mt-8 flex flex-col gap-6 w-full">
+          {onCancelEdit && (
+            <button onClick={onCancelEdit} className="w-full bg-[#f44336] text-white border-[4px] border-black py-4 rounded-[1.5rem] font-[900] text-xl shadow-[6px_6px_0px_0px_#000] hover:shadow-none hover:translate-x-[4px] hover:translate-y-[4px] transition-all flex items-center justify-center gap-3 uppercase">
+              <X size={24} /> Batal Edit (Buat Baru)
+            </button>
+          )}
           <button onClick={onGenerate} disabled={loading} className={`w-full border-[4px] border-black py-6 rounded-[2rem] font-[900] text-2xl shadow-[8px_8px_0px_0px_#000] hover:shadow-none hover:translate-x-[5px] hover:translate-y-[5px] transition-all flex items-center justify-center gap-4 uppercase ${loading ? 'bg-gray-300 cursor-wait' : 'bg-[#ffeb3b]'}`}>{loading ? <><Sparkles size={28} className="animate-spin" /> Sedang Mencetak...</> : <><RefreshCw size={28} /> {buttonText}</>}</button>
           {qrImage && (
             <div className="flex gap-4">

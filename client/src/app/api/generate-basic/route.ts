@@ -11,35 +11,46 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
+      editingId,
       data: qrData, type = 'link', rawData, smartTitle,
       dotsColor, dotsType, gradientColor2, cornersSquareType, cornersSquareColor,
       cornersDotType, cornersDotColor, backgroundColor, logoUrl, hideBackgroundDots
     } = body;
 
     const userId = req.headers.get('x-user-id');
-    const shortId = nanoid(6);
+    let shortId = nanoid(6);
 
-    const { error } = await supabaseServer
-      .from('dynamic_links')
-      .insert([{
-        short_id: shortId,
-        type,
-        first_name: smartTitle || null,
-        user_id: userId || null,
-        raw_data: rawData || { content: qrData },
-        dots_color: dotsColor,
-        gradient_color: gradientColor2,
-        dots_type: dotsType,
-        corners_square_type: cornersSquareType,
-        corners_square_color: cornersSquareColor,
-        corners_dot_type: cornersDotType,
-        corners_dot_color: cornersDotColor,
-        background_color: backgroundColor,
-        logo_url: logoUrl,
-        hide_background_dots: hideBackgroundDots
-      }]);
+    const payload: any = {
+      type,
+      first_name: smartTitle || null,
+      user_id: userId || null,
+      raw_data: rawData || { content: qrData },
+      dots_color: dotsColor,
+      gradient_color: gradientColor2,
+      dots_type: dotsType,
+      corners_square_type: cornersSquareType,
+      corners_square_color: cornersSquareColor,
+      corners_dot_type: cornersDotType,
+      corners_dot_color: cornersDotColor,
+      background_color: backgroundColor,
+      logo_url: logoUrl,
+      hide_background_dots: hideBackgroundDots
+    };
 
-    if (error) throw error;
+    if (editingId && userId) {
+      const { data: existing } = await supabaseServer.from('dynamic_links').select('short_id, user_id').eq('id', editingId).single();
+      if (existing && existing.user_id === userId) {
+        shortId = existing.short_id;
+        const { error } = await supabaseServer.from('dynamic_links').update(payload).eq('id', editingId);
+        if (error) throw error;
+      } else {
+        throw new Error("Tidak memiliki izin untuk mengedit QR ini");
+      }
+    } else {
+      payload.short_id = shortId;
+      const { error } = await supabaseServer.from('dynamic_links').insert([payload]);
+      if (error) throw error;
+    }
 
     const dynamicUrl = `${req.nextUrl.origin}/v/${shortId}`;
     const buffer = await QRCode.toBuffer(dynamicUrl, {

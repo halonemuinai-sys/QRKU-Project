@@ -7,25 +7,30 @@ export async function GET(req: NextRequest) {
   try {
     const userId = req.headers.get('x-user-id');
 
-    // Get user's link IDs
+    // Get user's links details for mapping
     let linkIds: string[] = [];
+    const linksMap = new Map();
     if (userId) {
       const { data: userLinks } = await supabaseServer
         .from('dynamic_links')
-        .select('id')
+        .select('id, short_id, first_name, last_name, type')
         .eq('user_id', userId);
-      linkIds = (userLinks || []).map((l: any) => l.id);
+      
+      if (userLinks) {
+        linkIds = userLinks.map((l: any) => l.id);
+        userLinks.forEach((l: any) => linksMap.set(l.id, l));
+      }
     }
 
     // If user has no links, return empty
     if (userId && linkIds.length === 0) {
-      return NextResponse.json({ chartData: [], osDistribution: [], mapMarkers: [], topCards: [], totalScans: 0 });
+      return NextResponse.json({ chartData: [], osDistribution: [], mapMarkers: [], topCards: [], totalScans: 0, regionalDistribution: [], rawLogs: [] });
     }
 
     let logsQuery = supabaseServer
       .from('scan_logs')
-      .select('scanned_at, os, city, country, lat, lon, link_id')
-      .order('scanned_at', { ascending: true });
+      .select('scanned_at, os, browser, city, country, lat, lon, link_id')
+      .order('scanned_at', { ascending: false }); // Latest scans first
 
     if (userId && linkIds.length > 0) {
       logsQuery = logsQuery.in('link_id', linkIds);
@@ -40,7 +45,7 @@ export async function GET(req: NextRequest) {
       acc[date] = (acc[date] || 0) + 1;
       return acc;
     }, {});
-    const chartData = Object.entries(dailyData).map(([name, scans]) => ({ name, scans }));
+    const chartData = Object.entries(dailyData).map(([name, scans]) => ({ name, scans })).reverse(); // order ascending for chart
 
     // OS Distribution
     const osData = (logs || []).reduce((acc: any, log: any) => {
@@ -56,6 +61,39 @@ export async function GET(req: NextRequest) {
       city: l.city,
       country: l.country
     }));
+
+    // Regional Demographics List
+    const regionalData = (logs || []).reduce((acc: any, log: any) => {
+      const city = log.city || 'Unknown';
+      const country = log.country || 'Unknown';
+      const key = `${city}|${country}`;
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    const regionalDistribution = Object.entries(regionalData)
+      .map(([key, scans]) => {
+        const [city, country] = key.split('|');
+        return { city, country, scans: scans as number };
+      })
+      .sort((a, b) => b.scans - a.scans);
+
+    // Detailed Raw Logs (for CSV download)
+    const rawLogs = (logs || []).map((log: any) => {
+      const linkInfo = linksMap.get(log.link_id) || {};
+      const qrName = linkInfo.type === 'vcard'
+        ? `${linkInfo.first_name || ''} ${linkInfo.last_name || ''}`.trim()
+        : `${String(linkInfo.type || 'Unknown').toUpperCase()} QR`;
+      
+      return {
+        scanned_at: log.scanned_at,
+        qr_name: qrName || 'Unknown Link',
+        short_id: linkInfo.short_id || '',
+        city: log.city || 'Unknown',
+        country: log.country || 'Unknown',
+        os: log.os || 'Unknown',
+        browser: log.browser || 'Unknown'
+      };
+    });
 
     // Top Cards
     let topQuery = supabaseServer
@@ -74,7 +112,9 @@ export async function GET(req: NextRequest) {
       osDistribution,
       mapMarkers,
       topCards,
-      totalScans: (logs || []).length
+      totalScans: (logs || []).length,
+      regionalDistribution,
+      rawLogs
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

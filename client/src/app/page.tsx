@@ -166,6 +166,44 @@ export default function Home() {
     } catch (error) { console.error(error); }
   };
 
+  const exportToCSV = () => {
+    if (!analyticsData?.rawLogs || analyticsData.rawLogs.length === 0) {
+      alert("Belum ada data scan yang bisa ditarik!");
+      return;
+    }
+
+    // Define CSV headers
+    const headers = ["Waktu Scan", "Nama QR", "Short ID", "Kota", "Negara", "Sistem Operasi (OS)", "Browser"];
+    
+    // Map data rows
+    const rows = analyticsData.rawLogs.map((log: any) => [
+      new Date(log.scanned_at).toLocaleString('id-ID'),
+      log.qr_name,
+      log.short_id,
+      log.city,
+      log.country,
+      log.os,
+      log.browser
+    ]);
+
+    // Construct CSV content with BOM for proper Excel encoding of special characters
+    const csvContent = "\uFEFF" + [
+      headers.join(","),
+      ...rows.map((row: any) => row.map((val: any) => `"${String(val).replace(/"/g, '""')}"`).join(","))
+    ].join("\n");
+
+    // Create a Blob and download it
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `BikinQR_Laporan_Analitik_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const fetchGallery = async () => {
     try {
       const response = await api.get("/api/gallery");
@@ -557,6 +595,61 @@ export default function Home() {
                         </div>
                       ))}
                     </div>
+                  </div>
+                </div>
+
+                {/* Regional Demographics List */}
+                <div className="lg:col-span-8 bg-white border-[4px] border-black shadow-[10px_10px_0px_0px_#000] rounded-[2.5rem] p-10">
+                  <h3 className="text-2xl font-black uppercase italic mb-8 flex items-center gap-3"><MapPin /> Daftar Demografi Wilayah</h3>
+                  
+                  {analyticsData?.regionalDistribution && analyticsData.regionalDistribution.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse">
+                        <thead>
+                          <tr className="border-b-[3px] border-black text-left text-xs font-black uppercase tracking-wider text-gray-500">
+                            <th className="pb-3 pr-4">Negara</th>
+                            <th className="pb-3 px-4">Kota / Daerah</th>
+                            <th className="pb-3 pl-4 text-right">Scan</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {analyticsData.regionalDistribution.map((region: any, i: number) => (
+                            <tr key={i} className="border-b-2 border-gray-100 hover:bg-gray-50 font-bold text-sm">
+                              <td className="py-4 pr-4 uppercase tracking-wider">{region.country}</td>
+                              <td className="py-4 px-4 text-black">{region.city}</td>
+                              <td className="py-4 pl-4 text-right font-black text-blue-500">{region.scans}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="py-10 text-center font-bold text-gray-300 italic">Belum ada data demografi wilayah...</div>
+                  )}
+                </div>
+
+                {/* Tarik Laporan / CSV Export */}
+                <div className="lg:col-span-4 bg-white border-[4px] border-black shadow-[10px_10px_0px_0px_#000] rounded-[2.5rem] p-10 flex flex-col justify-between">
+                  <div>
+                    <h3 className="text-2xl font-black uppercase italic mb-6 flex items-center gap-3"><Download /> Tarik Data</h3>
+                    <p className="text-xs font-bold text-gray-400 uppercase leading-relaxed mb-6">
+                      Unduh seluruh riwayat data scan QR Anda dalam format file Microsoft Excel / CSV untuk analisis lebih lanjut.
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="bg-gray-50 border-2 border-black rounded-2xl p-4 text-center">
+                      <div className="text-3xl font-black text-black">{analyticsData?.rawLogs?.length || 0}</div>
+                      <div className="text-[10px] font-black uppercase text-gray-400 mt-1">Baris Data Siap Diunduh</div>
+                    </div>
+                    
+                    <button 
+                      onClick={exportToCSV}
+                      disabled={!analyticsData?.rawLogs || analyticsData.rawLogs.length === 0}
+                      className="w-full bg-[#ffeb3b] text-black border-[3px] border-black py-4 rounded-2xl font-black uppercase italic text-sm shadow-[4px_4px_0px_0px_#000] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-[4px_4px_0px_0px_#000] disabled:hover:translate-x-0 disabled:hover:translate-y-0"
+                    >
+                      <Download size={18} /> Tarik Laporan (CSV)
+                    </button>
                   </div>
                 </div>
               </div>

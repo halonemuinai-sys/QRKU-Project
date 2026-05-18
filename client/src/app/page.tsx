@@ -114,8 +114,8 @@ export default function Home() {
 
   const cancelEdit = () => {
     setEditingId(null);
-    setQrImage("");
-    setSmartQrImage("");
+    setQrImage(null);
+    setSmartQrImage(null);
   };
 
   const [smartData, setSmartData] = useState({
@@ -164,6 +164,7 @@ export default function Home() {
   const [selectedTemplate, setSelectedTemplate] = useState("minimalist");
   const [qrImage, setQrImage] = useState<string | null>(null);
   const [smartQrImage, setSmartQrImage] = useState<string | null>(null);
+
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -353,11 +354,14 @@ export default function Home() {
         const errData = await response.json().catch(() => ({}));
         throw new Error(errData.error || `Server Error (${response.status})`);
       }
-      const blob = await response.blob();
-      setQrImage(URL.createObjectURL(blob));
+      await response.blob(); // consume body, we don't need the image after save
       setQrSaved(true);
       setEditingId(null);
       triggerConfetti();
+      setTimeout(() => {
+        setQrSaved(false);
+        setQrImage(null);
+      }, 2500);
     } catch (error: any) {
       alert("Gagal menyimpan QR: " + error.message);
     } finally {
@@ -433,11 +437,14 @@ export default function Home() {
         const errData = await response.json().catch(() => ({}));
         throw new Error(errData.error || `Server Error (${response.status})`);
       }
-      const blob = await response.blob();
-      setSmartQrImage(URL.createObjectURL(blob));
+      await response.blob();
       setSmartQrSaved(true);
       setEditingId(null);
       triggerConfetti();
+      setTimeout(() => {
+        setSmartQrSaved(false);
+        setSmartQrImage(null);
+      }, 2500);
     } catch (error: any) {
       alert("Gagal menyimpan Smart QR: " + error.message);
     } finally {

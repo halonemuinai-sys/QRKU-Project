@@ -75,6 +75,42 @@ const floatingVariants: Variants = {
 };
 
 
+const applyLogoToBlob = (blob: Blob, logoUrl: string, bgColor: string = '#ffffff'): Promise<string> => {
+  return new Promise((resolve) => {
+    const rawUrl = URL.createObjectURL(blob);
+    if (!logoUrl) return resolve(rawUrl);
+    
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx?.drawImage(img, 0, 0);
+      
+      const logo = new Image();
+      logo.crossOrigin = "anonymous";
+      logo.onload = () => {
+        const logoSize = img.width * 0.25;
+        const x = (img.width - logoSize) / 2;
+        const y = (img.height - logoSize) / 2;
+        
+        if (ctx) {
+          ctx.fillStyle = bgColor;
+          ctx.fillRect(x - 10, y - 10, logoSize + 20, logoSize + 20);
+          ctx.drawImage(logo, x, y, logoSize, logoSize);
+        }
+        resolve(canvas.toDataURL("image/png"));
+      };
+      logo.onerror = () => resolve(rawUrl);
+      logo.src = logoUrl;
+    };
+    img.onerror = () => resolve(rawUrl);
+    img.src = rawUrl;
+  });
+};
+
 export default function Home() {
   const { user, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
@@ -331,8 +367,8 @@ export default function Home() {
         const errData = await response.json().catch(() => ({}));
         throw new Error(errData.error || `Server Error (${response.status})`);
       }
-      const blob = await response.blob();
-      setQrImage(URL.createObjectURL(blob));
+      const finalUrl = await applyLogoToBlob(blob, formData.logoUrl, formData.backgroundColor);
+      setQrImage(finalUrl);
     } catch (error: any) {
       alert("Gagal preview QR: " + error.message);
     } finally {
@@ -405,8 +441,8 @@ export default function Home() {
         const errData = await response.json().catch(() => ({}));
         throw new Error(errData.error || `Server Error (${response.status})`);
       }
-      const blob = await response.blob();
-      setSmartQrImage(URL.createObjectURL(blob));
+      const finalUrl = await applyLogoToBlob(blob, formData.logoUrl, formData.backgroundColor);
+      setSmartQrImage(finalUrl);
     } catch (error: any) {
       alert("Gagal preview Smart QR: " + error.message);
     } finally {

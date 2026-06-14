@@ -76,6 +76,83 @@ const floatingVariants: Variants = {
 };
 
 
+const processLogoForLuxury = (logo: HTMLImageElement): HTMLCanvasElement => {
+  const canvas = document.createElement("canvas");
+  canvas.width = logo.width;
+  canvas.height = logo.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return canvas;
+  
+  ctx.drawImage(logo, 0, 0);
+  
+  try {
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imgData.data;
+    
+    // Detect if the logo has a white/light background.
+    // Check 4 corners.
+    const corners = [
+      { x: 0, y: 0 },
+      { x: canvas.width - 1, y: 0 },
+      { x: 0, y: canvas.height - 1 },
+      { x: canvas.width - 1, y: canvas.height - 1 }
+    ];
+    let lightCornersCount = 0;
+    for (const corner of corners) {
+      const idx = (corner.y * canvas.width + corner.x) * 4;
+      const r = data[idx];
+      const g = data[idx+1];
+      const b = data[idx+2];
+      const a = data[idx+3];
+      if (a > 50 && r > 200 && g > 200 && b > 200) {
+        lightCornersCount++;
+      }
+    }
+    const hasWhiteBackground = lightCornersCount >= 2;
+    
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i+1];
+      const b = data[i+2];
+      const a = data[i+3];
+      
+      if (a === 0) continue;
+      
+      if (hasWhiteBackground) {
+        // White background: turn white pixels transparent, and dark/colored elements white
+        if (r > 215 && g > 215 && b > 215) {
+          data[i+3] = 0; // Transparent
+        } else {
+          data[i] = 255;
+          data[i+1] = 255;
+          data[i+2] = 255;
+        }
+      } else {
+        // Transparent background: turn dark elements white
+        const brightness = (r + g + b) / 3;
+        if (brightness < 160) {
+          data[i] = 255;
+          data[i+1] = 255;
+          data[i+2] = 255;
+        }
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+  } catch (e) {
+    console.warn("Failed to process logo pixels due to CORS/security, using filter fallback:", e);
+    try {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.filter = 'brightness(0) invert(1)';
+      ctx.drawImage(logo, 0, 0);
+      ctx.filter = 'none';
+    } catch (filterError) {
+      ctx.drawImage(logo, 0, 0);
+    }
+  }
+  
+  return canvas;
+};
+
 const applyLogoToBlob = (blob: Blob, logoUrl: string, bgColor: string = '#ffffff', frameStyle: string = 'none'): Promise<string> => {
   return new Promise((resolve) => {
     const rawUrl = URL.createObjectURL(blob);
@@ -84,14 +161,22 @@ const applyLogoToBlob = (blob: Blob, logoUrl: string, bgColor: string = '#ffffff
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
     const img = new Image();
-    img.crossOrigin = "anonymous";
+    
+    // Only set crossOrigin if logoUrl is a remote URL and not same-origin
+    if (rawUrl.startsWith('http') && !rawUrl.startsWith('blob:') && !rawUrl.startsWith(window.location.origin)) {
+      img.crossOrigin = "anonymous";
+    }
+    
     img.onload = () => {
       canvas.width = img.width;
       canvas.height = img.height;
       ctx?.drawImage(img, 0, 0);
       
       const logo = new Image();
-      logo.crossOrigin = "anonymous";
+      if (logoUrl.startsWith('http') && !logoUrl.startsWith('blob:') && !logoUrl.startsWith(window.location.origin)) {
+        logo.crossOrigin = "anonymous";
+      }
+      
       logo.onload = () => {
         const maxLogoSize = img.width * 0.32;
         
@@ -116,32 +201,49 @@ const applyLogoToBlob = (blob: Blob, logoUrl: string, bgColor: string = '#ffffff
         
         if (ctx) {
           if (frameStyle === 'luxury') {
+            // Dark gray box for luxury
             ctx.fillStyle = '#111111';
             ctx.beginPath();
-            ctx.roundRect(bgX, bgY, bgWidth, bgHeight, 16);
+            if (ctx.roundRect) {
+              ctx.roundRect(bgX, bgY, bgWidth, bgHeight, 16);
+            } else {
+              ctx.rect(bgX, bgY, bgWidth, bgHeight);
+            }
             ctx.fill();
             
+            // White outline for the box
             ctx.lineWidth = 4;
             ctx.strokeStyle = '#ffffff';
             ctx.stroke();
 
-            ctx.filter = 'brightness(0) invert(1)';
-            ctx.drawImage(logo, logoX, logoY, targetWidth, targetHeight);
-            ctx.filter = 'none';
+            // Process the logo to fit on the black background nicely (invert/remove white background)
+            const processedLogo = processLogoForLuxury(logo);
+            ctx.drawImage(processedLogo, logoX, logoY, targetWidth, targetHeight);
           } else {
+            // Standard background box
             ctx.fillStyle = bgColor;
             ctx.beginPath();
-            ctx.roundRect(bgX, bgY, bgWidth, bgHeight, 16);
+            if (ctx.roundRect) {
+              ctx.roundRect(bgX, bgY, bgWidth, bgHeight, 16);
+            } else {
+              ctx.rect(bgX, bgY, bgWidth, bgHeight);
+            }
             ctx.fill();
             ctx.drawImage(logo, logoX, logoY, targetWidth, targetHeight);
           }
         }
         resolve(canvas.toDataURL("image/png"));
       };
-      logo.onerror = () => resolve(rawUrl);
+      logo.onerror = () => {
+        console.warn("Failed to load logo image:", logoUrl);
+        resolve(rawUrl);
+      };
       logo.src = logoUrl;
     };
-    img.onerror = () => resolve(rawUrl);
+    img.onerror = () => {
+      console.warn("Failed to load QR base blob image");
+      resolve(rawUrl);
+    };
     img.src = rawUrl;
   });
 };

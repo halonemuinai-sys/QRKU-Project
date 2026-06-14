@@ -148,16 +148,14 @@ export default function Home() {
   });
 
   const defaultLogos = [
-    { name: 'Facebook', url: 'https://cdn.simpleicons.org/facebook/1877F2' },
-    { name: 'Twitter', url: 'https://cdn.simpleicons.org/twitter/1DA1F2' },
-    { name: 'WhatsApp', url: 'https://cdn.simpleicons.org/whatsapp/25D366' },
-    { name: 'Instagram', url: 'https://cdn.simpleicons.org/instagram/E4405F' },
-    { name: 'LinkedIn', url: 'https://cdn.simpleicons.org/linkedin/0A66C2' },
-    { name: 'YouTube', url: 'https://cdn.simpleicons.org/youtube/FF0000' },
-    { name: 'Google', url: 'https://cdn.simpleicons.org/google/4285F4' },
-    { name: 'Bvlgari', url: '/uploads/bvlgari.png' },
-    { name: 'Omega', url: '/uploads/omega.png' },
-    { name: 'Cartier', url: '/uploads/cartier.png' },
+    { name: 'Facebook', url: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/facebook.svg' },
+    { name: 'X', url: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/x.svg' },
+    { name: 'WhatsApp', url: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/whatsapp.svg' },
+    { name: 'Instagram', url: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/instagram.svg' },
+    { name: 'LinkedIn', url: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/linkedin.svg' },
+    { name: 'YouTube', url: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/youtube.svg' },
+    { name: 'Google', url: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/google.svg' },
+    { name: 'Chronologie', url: '/logo-chronologie.png' },
   ];
 
   const [activeTab, setActiveTab] = useState<"qr" | "vcard" | "smart" | "analytics" | "gallery">("qr");

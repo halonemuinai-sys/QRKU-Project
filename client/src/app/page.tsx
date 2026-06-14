@@ -92,14 +92,33 @@ const applyLogoToBlob = (blob: Blob, logoUrl: string, bgColor: string = '#ffffff
       const logo = new Image();
       logo.crossOrigin = "anonymous";
       logo.onload = () => {
-        const logoSize = img.width * 0.25;
-        const x = (img.width - logoSize) / 2;
-        const y = (img.height - logoSize) / 2;
+        const maxLogoSize = img.width * 0.32;
+        
+        let targetWidth = maxLogoSize;
+        let targetHeight = maxLogoSize;
+        
+        if (logo.width > logo.height) {
+          targetHeight = maxLogoSize * (logo.height / logo.width);
+        } else if (logo.height > logo.width) {
+          targetWidth = maxLogoSize * (logo.width / logo.height);
+        }
+        
+        const padding = 24;
+        const bgWidth = targetWidth + padding * 2;
+        const bgHeight = targetHeight + padding * 2;
+        
+        const bgX = (img.width - bgWidth) / 2;
+        const bgY = (img.height - bgHeight) / 2;
+        
+        const logoX = (img.width - targetWidth) / 2;
+        const logoY = (img.height - targetHeight) / 2;
         
         if (ctx) {
           ctx.fillStyle = bgColor;
-          ctx.fillRect(x - 10, y - 10, logoSize + 20, logoSize + 20);
-          ctx.drawImage(logo, x, y, logoSize, logoSize);
+          ctx.beginPath();
+          ctx.roundRect(bgX, bgY, bgWidth, bgHeight, 16);
+          ctx.fill();
+          ctx.drawImage(logo, logoX, logoY, targetWidth, targetHeight);
         }
         resolve(canvas.toDataURL("image/png"));
       };

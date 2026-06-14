@@ -452,17 +452,31 @@ export default function Home() {
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    
+    // Check file size (limit to 2MB to prevent huge DB payloads)
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Ukuran logo maksimal 2MB!");
+      return;
+    }
+
     setUploading(true);
-    const uploadData = new FormData();
-    uploadData.append("logo", file);
-    try {
-      const response = await api.post("/api/upload", uploadData);
-      setFormData({ ...formData, logoUrl: response.data.url });
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64Url = event.target?.result as string;
+      setFormData({ ...formData, logoUrl: base64Url });
+      setUploading(false);
       triggerConfetti();
-    } catch (error) { console.error(error); } finally { setUploading(false); }
+    };
+    reader.onerror = () => {
+      alert("Gagal membaca file gambar.");
+      setUploading(false);
+    };
+    
+    reader.readAsDataURL(file);
   };
 
   const useMyLocation = () => {

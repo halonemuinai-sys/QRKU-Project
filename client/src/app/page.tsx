@@ -44,7 +44,8 @@ import {
   Camera,
   Play,
   Smartphone,
-  LogOut
+  LogOut,
+  Crown
 } from "lucide-react";
 
 import { 
@@ -75,7 +76,7 @@ const floatingVariants: Variants = {
 };
 
 
-const applyLogoToBlob = (blob: Blob, logoUrl: string, bgColor: string = '#ffffff'): Promise<string> => {
+const applyLogoToBlob = (blob: Blob, logoUrl: string, bgColor: string = '#ffffff', frameStyle: string = 'none'): Promise<string> => {
   return new Promise((resolve) => {
     const rawUrl = URL.createObjectURL(blob);
     if (!logoUrl) return resolve(rawUrl);
@@ -114,11 +115,26 @@ const applyLogoToBlob = (blob: Blob, logoUrl: string, bgColor: string = '#ffffff
         const logoY = (img.height - targetHeight) / 2;
         
         if (ctx) {
-          ctx.fillStyle = bgColor;
-          ctx.beginPath();
-          ctx.roundRect(bgX, bgY, bgWidth, bgHeight, 16);
-          ctx.fill();
-          ctx.drawImage(logo, logoX, logoY, targetWidth, targetHeight);
+          if (frameStyle === 'luxury') {
+            ctx.fillStyle = '#111111';
+            ctx.beginPath();
+            ctx.roundRect(bgX, bgY, bgWidth, bgHeight, 16);
+            ctx.fill();
+            
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#ffffff';
+            ctx.stroke();
+
+            ctx.filter = 'brightness(0) invert(1)';
+            ctx.drawImage(logo, logoX, logoY, targetWidth, targetHeight);
+            ctx.filter = 'none';
+          } else {
+            ctx.fillStyle = bgColor;
+            ctx.beginPath();
+            ctx.roundRect(bgX, bgY, bgWidth, bgHeight, 16);
+            ctx.fill();
+            ctx.drawImage(logo, logoX, logoY, targetWidth, targetHeight);
+          }
         }
         resolve(canvas.toDataURL("image/png"));
       };
@@ -195,7 +211,7 @@ export default function Home() {
   const [galleryFilter, setGalleryFilter] = useState<"all" | "vcard" | "smart">("all");
 
   const [frameConfig, setFrameConfig] = useState({
-    style: "none" as "none" | "rounded" | "badge" | "banner" | "circle",
+    style: "none" as "none" | "rounded" | "badge" | "banner" | "circle" | "luxury",
     label: "SCAN ME",
     frameColor: "#000000",
     labelColor: "#ffffff",
@@ -387,7 +403,7 @@ export default function Home() {
         throw new Error(errData.error || `Server Error (${response.status})`);
       }
       const blob = await response.blob();
-      const finalUrl = await applyLogoToBlob(blob, formData.logoUrl, formData.backgroundColor);
+      const finalUrl = await applyLogoToBlob(blob, formData.logoUrl, formData.backgroundColor, frameConfig.style);
       setQrImage(finalUrl);
     } catch (error: any) {
       alert("Gagal preview QR: " + error.message);
@@ -462,7 +478,7 @@ export default function Home() {
         throw new Error(errData.error || `Server Error (${response.status})`);
       }
       const blob = await response.blob();
-      const finalUrl = await applyLogoToBlob(blob, formData.logoUrl, formData.backgroundColor);
+      const finalUrl = await applyLogoToBlob(blob, formData.logoUrl, formData.backgroundColor, frameConfig.style);
       setSmartQrImage(finalUrl);
     } catch (error: any) {
       alert("Gagal preview Smart QR: " + error.message);
@@ -1042,7 +1058,8 @@ function PreviewSection({ title, qrImage, loading, saving, onGenerate, onSave, s
     { id: "rounded", name: "Rounded", icon: <Square size={14}/> },
     { id: "badge", name: "Badge", icon: <Star size={14}/> },
     { id: "banner", name: "Banner", icon: <Layout size={14}/> },
-    { id: "circle", name: "Circle", icon: <Circle size={14}/> }
+    { id: "circle", name: "Circle", icon: <Circle size={14}/> },
+    { id: "luxury", name: "Luxury Gold", icon: <Crown size={14}/> }
   ];
 
   const downloadFramedQR = async () => {
@@ -1144,6 +1161,26 @@ function PreviewSection({ title, qrImage, loading, saving, onGenerate, onSave, s
         ctx.font = "bold 24px Arial, sans-serif";
         ctx.textAlign = "center";
         ctx.fillText(frameConfig.customLabel || frameConfig.label, centerX, totalW + 15);
+      } else if (frameConfig.style === "luxury") {
+        const luxuryRadius = 40;
+        
+        ctx.fillStyle = "#a88645"; // Gold color
+        ctx.beginPath();
+        ctx.roundRect(0, 0, totalW, totalH, luxuryRadius);
+        ctx.fill();
+        
+        const innerBorder = 14;
+        ctx.fillStyle = "#111111"; // Black inner frame
+        ctx.beginPath();
+        ctx.roundRect(innerBorder, innerBorder, totalW - innerBorder*2, totalH - innerBorder*2, luxuryRadius - 6);
+        ctx.fill();
+        
+        ctx.fillStyle = "#f4f4f4"; // Soft background
+        ctx.beginPath();
+        ctx.roundRect(padding, padding, qrSize, qrSize, luxuryRadius - 15);
+        ctx.fill();
+        
+        ctx.drawImage(img, padding, padding, qrSize, qrSize);
       }
 
       const link = document.createElement("a");
@@ -1163,14 +1200,17 @@ function PreviewSection({ title, qrImage, loading, saving, onGenerate, onSave, s
 
         {/* QR with Frame Preview */}
         {(() => {
-          const frameContainerStyle = { padding: frameConfig.style !== "none" ? "20px" : "0" };
+          const isLuxury = frameConfig.style === "luxury";
+          const frameContainerStyle = { padding: frameConfig.style !== "none" ? (isLuxury ? "28px" : "20px") : "0" };
           const frameBgStyle = { backgroundColor: frameConfig.frameColor, border: '4px solid black', boxShadow: '10px 10px 0px 0px black' };
           const labelStyle = { backgroundColor: frameConfig.style === 'badge' ? frameConfig.frameColor : 'transparent', color: frameConfig.style === 'badge' ? frameConfig.labelColor : frameConfig.frameColor };
           
           return (
             <div className="relative" style={frameContainerStyle}>
               {frameConfig.style !== "none" && (
-                <div className={`absolute inset-0 ${frameConfig.style === 'circle' ? 'rounded-full' : 'rounded-[2.5rem]'}`} style={frameBgStyle} />
+                <div className={`absolute inset-0 ${frameConfig.style === 'circle' ? 'rounded-full' : 'rounded-[2.5rem]'}`} style={frameBgStyle}>
+                  {isLuxury && <div className="absolute inset-2.5 border-[6px] border-[#111111] rounded-[2rem]"></div>}
+                </div>
               )}
               <div className={`bg-white p-8 border-[4px] border-black rounded-[2rem] shadow-[6px_6px_0px_0px_#000] relative z-10 ${frameConfig.style === 'circle' ? 'rounded-full overflow-hidden' : ''}`}>
                 <AnimatePresence mode="wait">

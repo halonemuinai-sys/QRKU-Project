@@ -367,6 +367,7 @@ export default function Home() {
         const errData = await response.json().catch(() => ({}));
         throw new Error(errData.error || `Server Error (${response.status})`);
       }
+      const blob = await response.blob();
       const finalUrl = await applyLogoToBlob(blob, formData.logoUrl, formData.backgroundColor);
       setQrImage(finalUrl);
     } catch (error: any) {
@@ -441,6 +442,7 @@ export default function Home() {
         const errData = await response.json().catch(() => ({}));
         throw new Error(errData.error || `Server Error (${response.status})`);
       }
+      const blob = await response.blob();
       const finalUrl = await applyLogoToBlob(blob, formData.logoUrl, formData.backgroundColor);
       setSmartQrImage(finalUrl);
     } catch (error: any) {

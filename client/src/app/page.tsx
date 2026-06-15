@@ -415,76 +415,33 @@ export default function Home() {
   const downloadGalleryQR = async (item: any) => {
     setDownloadingId(item.id);
     try {
-      let response;
-      if (item.type === "vcard") {
-        const vcardBody = {
-          previewOnly: true,
-          firstName: item.first_name,
-          lastName: item.last_name,
-          organization: item.organization,
-          title: item.position,
-          phone: item.phone,
-          email: item.email,
-          url: item.website,
-          dotsColor: item.dots_color,
-          dotsType: item.dots_type,
-          gradientColor2: item.gradient_color,
-          cornersSquareType: item.corners_square_type,
-          cornersSquareColor: item.corners_square_color,
-          cornersDotType: item.corners_dot_type,
-          cornersDotColor: item.corners_dot_color,
-          backgroundColor: item.background_color,
-          logoUrl: item.logo_url,
-          hideBackgroundDots: item.hide_background_dots
-        };
-        response = await fetch("/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-user-id": user?.id || "" },
-          body: JSON.stringify(vcardBody),
-        });
-      } else {
-        let finalData = "";
-        if (item.type === 'link') {
-          finalData = item.raw_data?.content || "";
-        } else if (item.type === 'wifi') {
-          finalData = `WIFI:S:${item.raw_data?.ssid};T:${item.raw_data?.encryption || "WPA"};P:${item.raw_data?.password};;`;
-        } else if (item.type === 'maps') {
-          finalData = `https://www.google.com/maps/search/?api=1&query=${item.raw_data?.lat},${item.raw_data?.lon}`;
-        } else if (item.type === 'whatsapp') {
-          const cleanNumber = (item.raw_data?.waNumber || "").replace(/[^0-9+]/g, '');
-          finalData = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(item.raw_data?.waMessage || "")}`;
-        } else if (item.type === 'instagram') {
-          const cleanUsername = (item.raw_data?.igUsername || "").replace('@', '').trim();
-          finalData = `https://instagram.com/${cleanUsername}`;
-        } else if (item.type === 'tiktok') {
-          const cleanUsername = (item.raw_data?.ttUsername || "").replace('@', '').trim();
-          finalData = `https://tiktok.com/@${cleanUsername}`;
-        }
-        
-        const smartBody = {
-          data: finalData,
-          type: item.type,
-          smartTitle: item.first_name,
-          rawData: item.raw_data,
-          previewOnly: true,
-          dotsColor: item.dots_color,
-          dotsType: item.dots_type,
-          gradientColor2: item.gradient_color,
-          cornersSquareType: item.corners_square_type,
-          cornersSquareColor: item.corners_square_color,
-          cornersDotType: item.corners_dot_type,
-          cornersDotColor: item.corners_dot_color,
-          backgroundColor: item.background_color,
-          logoUrl: item.logo_url,
-          hideBackgroundDots: item.hide_background_dots
-        };
-        
-        response = await fetch("/api/generate-basic", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-user-id": user?.id || "" },
-          body: JSON.stringify(smartBody),
-        });
-      }
+      const shortUrl = typeof window !== "undefined" 
+        ? `${window.location.origin}/v/${item.short_id}` 
+        : `/v/${item.short_id}`;
+
+      const smartBody = {
+        data: shortUrl,
+        type: item.type,
+        smartTitle: item.first_name,
+        rawData: item.raw_data,
+        previewOnly: true,
+        dotsColor: item.dots_color,
+        dotsType: item.dots_type,
+        gradientColor2: item.gradient_color,
+        cornersSquareType: item.corners_square_type,
+        cornersSquareColor: item.corners_square_color,
+        cornersDotType: item.corners_dot_type,
+        cornersDotColor: item.corners_dot_color,
+        backgroundColor: item.background_color,
+        logoUrl: item.logo_url,
+        hideBackgroundDots: item.hide_background_dots
+      };
+      
+      const response = await fetch("/api/generate-basic", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-user-id": user?.id || "" },
+        body: JSON.stringify(smartBody),
+      });
       
       if (!response.ok) {
         throw new Error(`Failed to generate base QR`);
@@ -537,76 +494,33 @@ export default function Home() {
       for (let i = 0; i < itemsToDownload.length; i++) {
         const item = itemsToDownload[i];
         
-        let response;
-        if (item.type === "vcard") {
-          const vcardBody = {
-            previewOnly: true,
-            firstName: item.first_name,
-            lastName: item.last_name,
-            organization: item.organization,
-            title: item.position,
-            phone: item.phone,
-            email: item.email,
-            url: item.website,
-            dotsColor: item.dots_color,
-            dotsType: item.dots_type,
-            gradientColor2: item.gradient_color,
-            cornersSquareType: item.corners_square_type,
-            cornersSquareColor: item.corners_square_color,
-            cornersDotType: item.corners_dot_type,
-            cornersDotColor: item.corners_dot_color,
-            backgroundColor: item.background_color,
-            logoUrl: item.logo_url,
-            hideBackgroundDots: item.hide_background_dots
-          };
-          response = await fetch("/api/generate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "x-user-id": user?.id || "" },
-            body: JSON.stringify(vcardBody),
-          });
-        } else {
-          let finalData = "";
-          if (item.type === 'link') {
-            finalData = item.raw_data?.content || "";
-          } else if (item.type === 'wifi') {
-            finalData = `WIFI:S:${item.raw_data?.ssid};T:${item.raw_data?.encryption || "WPA"};P:${item.raw_data?.password};;`;
-          } else if (item.type === 'maps') {
-            finalData = `https://www.google.com/maps/search/?api=1&query=${item.raw_data?.lat},${item.raw_data?.lon}`;
-          } else if (item.type === 'whatsapp') {
-            const cleanNumber = (item.raw_data?.waNumber || "").replace(/[^0-9+]/g, '');
-            finalData = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(item.raw_data?.waMessage || "")}`;
-          } else if (item.type === 'instagram') {
-            const cleanUsername = (item.raw_data?.igUsername || "").replace('@', '').trim();
-            finalData = `https://instagram.com/${cleanUsername}`;
-          } else if (item.type === 'tiktok') {
-            const cleanUsername = (item.raw_data?.ttUsername || "").replace('@', '').trim();
-            finalData = `https://tiktok.com/@${cleanUsername}`;
-          }
-          
-          const smartBody = {
-            data: finalData,
-            type: item.type,
-            smartTitle: item.first_name,
-            rawData: item.raw_data,
-            previewOnly: true,
-            dotsColor: item.dots_color,
-            dotsType: item.dots_type,
-            gradientColor2: item.gradient_color,
-            cornersSquareType: item.corners_square_type,
-            cornersSquareColor: item.corners_square_color,
-            cornersDotType: item.corners_dot_type,
-            cornersDotColor: item.corners_dot_color,
-            backgroundColor: item.background_color,
-            logoUrl: item.logo_url,
-            hideBackgroundDots: item.hide_background_dots
-          };
-          
-          response = await fetch("/api/generate-basic", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "x-user-id": user?.id || "" },
-            body: JSON.stringify(smartBody),
-          });
-        }
+        const shortUrl = typeof window !== "undefined" 
+          ? `${window.location.origin}/v/${item.short_id}` 
+          : `/v/${item.short_id}`;
+
+        const smartBody = {
+          data: shortUrl,
+          type: item.type,
+          smartTitle: item.first_name,
+          rawData: item.raw_data,
+          previewOnly: true,
+          dotsColor: item.dots_color,
+          dotsType: item.dots_type,
+          gradientColor2: item.gradient_color,
+          cornersSquareType: item.corners_square_type,
+          cornersSquareColor: item.corners_square_color,
+          cornersDotType: item.corners_dot_type,
+          cornersDotColor: item.corners_dot_color,
+          backgroundColor: item.background_color,
+          logoUrl: item.logo_url,
+          hideBackgroundDots: item.hide_background_dots
+        };
+        
+        const response = await fetch("/api/generate-basic", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-user-id": user?.id || "" },
+          body: JSON.stringify(smartBody),
+        });
 
         if (!response.ok) {
           console.warn(`Gagal generate QR untuk ${item.first_name}`);
@@ -624,7 +538,6 @@ export default function Home() {
         const cleanName = name.replace(/[\/\\?%*:|"<>]/g, '-');
         zip.file(`${cleanName}.png`, base64Data, { base64: true });
 
-        const shortUrl = typeof window !== "undefined" ? `${window.location.origin}/v/${item.short_id}` : `/v/${item.short_id}`;
         txtContent += `Judul: ${name}\n`;
         txtContent += `Short Link (Versi QR): ${shortUrl}\n`;
         txtContent += `Tautan Asli: ${item.raw_data?.content || "-"}\n`;

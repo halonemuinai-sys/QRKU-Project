@@ -342,14 +342,18 @@ export default function Home() {
   const [qrSaved, setQrSaved] = useState(false);
   const [smartQrSaved, setSmartQrSaved] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [galleryLoading, setGalleryLoading] = useState(false);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
 
   const fetchAnalytics = async () => {
+    setAnalyticsLoading(true);
     try {
-      const response = await api.get("/api/analytics");
+      const response = await api.get(`/api/analytics?t=${Date.now()}`);
       setAnalyticsData(response.data);
     } catch (error) { console.error(error); }
+    finally { setAnalyticsLoading(false); }
   };
 
   const exportToCSV = () => {
@@ -391,10 +395,12 @@ export default function Home() {
   };
 
   const fetchGallery = async () => {
+    setGalleryLoading(true);
     try {
-      const response = await api.get("/api/gallery");
+      const response = await api.get(`/api/gallery?t=${Date.now()}`);
       setGalleryData(response.data);
     } catch (error) { console.error(error); }
+    finally { setGalleryLoading(false); }
   };
 
   const deleteQR = async (id: string) => {
@@ -865,8 +871,20 @@ export default function Home() {
           <NavButton active={activeTab === "qr"} onClick={() => setActiveTab("qr")} icon={<User size={20}/>} label="vCard QR" color="#ffeb3b" />
           <NavButton active={activeTab === "smart"} onClick={() => setActiveTab("smart")} icon={<Zap size={20}/>} label="Smart QR" color="#4caf50" />
           <NavButton active={activeTab === "vcard"} onClick={() => setActiveTab("vcard")} icon={<Briefcase size={20}/>} label="Card Preview" color="#2196f3" />
-          <NavButton active={activeTab === "gallery"} onClick={() => setActiveTab("gallery")} icon={<History size={20}/>} label="My Gallery" color="#ff9800" />
-          <NavButton active={activeTab === "analytics"} onClick={() => setActiveTab("analytics")} icon={<BarChart3 size={20}/>} label="Analytics" color="#ff4081" />
+          <NavButton active={activeTab === "gallery"} onClick={() => {
+            if (activeTab === "gallery") {
+              fetchGallery();
+            } else {
+              setActiveTab("gallery");
+            }
+          }} icon={<History size={20}/>} label="My Gallery" color="#ff9800" />
+          <NavButton active={activeTab === "analytics"} onClick={() => {
+            if (activeTab === "analytics") {
+              fetchAnalytics();
+            } else {
+              setActiveTab("analytics");
+            }
+          }} icon={<BarChart3 size={20}/>} label="Analytics" color="#ff4081" />
         </nav>
 
         <AnimatePresence mode="wait">
@@ -965,6 +983,22 @@ export default function Home() {
             </motion.div>
           ) : activeTab === "analytics" ? (
             <motion.div key="analytics-tab" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-10">
+              {/* Header */}
+              <div className="bg-white border-[4px] border-black rounded-[2rem] p-6 shadow-[8px_8px_0px_0px_#000] flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div>
+                  <h3 className="text-2xl font-black uppercase italic flex items-center gap-3"><BarChart3 /> Dashboard Analytics</h3>
+                  <p className="text-xs font-bold text-gray-400 uppercase mt-1">Real-time Scan Insights</p>
+                </div>
+                <div>
+                  <button 
+                    type="button" 
+                    onClick={fetchAnalytics} 
+                    className="bg-[#ffeb3b] text-black border-[3px] border-black px-5 py-2.5 rounded-2xl font-black uppercase text-sm shadow-[4px_4px_0px_0px_#000] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all flex items-center gap-2"
+                  >
+                    <RefreshCw size={16} className={analyticsLoading ? "animate-spin" : ""} /> Perbarui
+                  </button>
+                </div>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <StatCard title="Total Scans" value={analyticsData?.totalScans || 0} icon={<TrendingUp className="text-blue-500" />} color="bg-[#e3f2fd]" />
                 <StatCard title="Active QRs" value={analyticsData?.topCards?.length || 0} icon={<QrCode className="text-green-500" />} color="bg-[#e8f5e9]" />
@@ -1090,6 +1124,13 @@ export default function Home() {
                     <p className="text-xs font-bold text-gray-400 uppercase mt-1">{galleryData.length} QR Tersimpan</p>
                   </div>
                   <div className="flex items-center gap-3">
+                    <button 
+                      type="button" 
+                      onClick={fetchGallery} 
+                      className="bg-[#ffeb3b] text-black border-[3px] border-black px-5 py-2.5 rounded-2xl font-black uppercase text-sm shadow-[4px_4px_0px_0px_#000] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all flex items-center gap-2"
+                    >
+                      <RefreshCw size={16} className={galleryLoading ? "animate-spin" : ""} /> Perbarui
+                    </button>
                     {galleryData.length > 0 && (
                       <button 
                         type="button" 

@@ -66,8 +66,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ shortI
     );
   }
 
-  // Log the scan asynchronously
-  logScan(data.id, data.scan_count || 0);
+  // Log the scan and wait for it to complete
+  await logScan(data.id, data.scan_count || 0);
 
   // Redirect based on type
   if (data.type === 'whatsapp') {

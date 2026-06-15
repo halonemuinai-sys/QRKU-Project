@@ -410,6 +410,104 @@ export default function Home() {
     }
   };
 
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const downloadGalleryQR = async (item: any) => {
+    setDownloadingId(item.id);
+    try {
+      let response;
+      if (item.type === "vcard") {
+        const vcardBody = {
+          previewOnly: true,
+          firstName: item.first_name,
+          lastName: item.last_name,
+          organization: item.organization,
+          title: item.position,
+          phone: item.phone,
+          email: item.email,
+          url: item.website,
+          dotsColor: item.dots_color,
+          dotsType: item.dots_type,
+          gradientColor2: item.gradient_color,
+          cornersSquareType: item.corners_square_type,
+          cornersSquareColor: item.corners_square_color,
+          cornersDotType: item.corners_dot_type,
+          cornersDotColor: item.corners_dot_color,
+          backgroundColor: item.background_color,
+          logoUrl: item.logo_url,
+          hideBackgroundDots: item.hide_background_dots
+        };
+        response = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-user-id": user?.id || "" },
+          body: JSON.stringify(vcardBody),
+        });
+      } else {
+        let finalData = "";
+        if (item.type === 'link') {
+          finalData = item.raw_data?.content || "";
+        } else if (item.type === 'wifi') {
+          finalData = `WIFI:S:${item.raw_data?.ssid};T:${item.raw_data?.encryption || "WPA"};P:${item.raw_data?.password};;`;
+        } else if (item.type === 'maps') {
+          finalData = `https://www.google.com/maps/search/?api=1&query=${item.raw_data?.lat},${item.raw_data?.lon}`;
+        } else if (item.type === 'whatsapp') {
+          const cleanNumber = (item.raw_data?.waNumber || "").replace(/[^0-9+]/g, '');
+          finalData = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(item.raw_data?.waMessage || "")}`;
+        } else if (item.type === 'instagram') {
+          const cleanUsername = (item.raw_data?.igUsername || "").replace('@', '').trim();
+          finalData = `https://instagram.com/${cleanUsername}`;
+        } else if (item.type === 'tiktok') {
+          const cleanUsername = (item.raw_data?.ttUsername || "").replace('@', '').trim();
+          finalData = `https://tiktok.com/@${cleanUsername}`;
+        }
+        
+        const smartBody = {
+          data: finalData,
+          type: item.type,
+          smartTitle: item.first_name,
+          rawData: item.raw_data,
+          previewOnly: true,
+          dotsColor: item.dots_color,
+          dotsType: item.dots_type,
+          gradientColor2: item.gradient_color,
+          cornersSquareType: item.corners_square_type,
+          cornersSquareColor: item.corners_square_color,
+          cornersDotType: item.corners_dot_type,
+          cornersDotColor: item.corners_dot_color,
+          backgroundColor: item.background_color,
+          logoUrl: item.logo_url,
+          hideBackgroundDots: item.hide_background_dots
+        };
+        
+        response = await fetch("/api/generate-basic", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-user-id": user?.id || "" },
+          body: JSON.stringify(smartBody),
+        });
+      }
+      
+      if (!response.ok) {
+        throw new Error(`Failed to generate base QR`);
+      }
+      
+      const blob = await response.blob();
+      const finalUrl = await applyLogoToBlob(blob, item.logo_url, item.background_color, 'none');
+      
+      const link = document.createElement("a");
+      const name = item.type === "vcard" 
+        ? `${item.first_name || ""} ${item.last_name || ""}`.trim() || "vCard"
+        : item.first_name || item.type || "QR";
+      link.download = `QR-${name.replace(/\s+/g, "_")}.png`;
+      link.href = finalUrl;
+      link.click();
+      triggerConfetti();
+    } catch (error: any) {
+      alert("Gagal mengunduh QR: " + error.message);
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   const deleteAllQRs = async () => {
     if (galleryData.length === 0) return;
     if (!window.confirm("⚠️ BAHAYA! Anda akan menghapus SELURUH gallery. Yakin?")) return;
@@ -1021,6 +1119,18 @@ export default function Home() {
 
                         {/* Actions */}
                         <div className="flex md:flex-col gap-2 w-full md:w-auto">
+                          <button 
+                            type="button" 
+                            disabled={downloadingId === item.id}
+                            onClick={() => downloadGalleryQR(item)} 
+                            className="flex-1 md:flex-none bg-[#4caf50] hover:bg-[#43a047] text-white border-[3px] border-black px-5 py-3 rounded-xl font-black text-sm shadow-[3px_3px_0px_0px_#000] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                          >
+                            {downloadingId === item.id ? (
+                              <>Loading...</>
+                            ) : (
+                              <><Download size={15}/> Unduh</>
+                            )}
+                          </button>
                           <button type="button" onClick={() => { setActiveTab(isVcard ? "qr" : "smart"); restoreQR(item); }} className="flex-1 md:flex-none bg-[#ffeb3b] border-[3px] border-black px-5 py-3 rounded-xl font-black text-sm shadow-[3px_3px_0px_0px_#000] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all flex items-center justify-center gap-2">
                             <Edit3 size={15}/> Edit
                           </button>

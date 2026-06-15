@@ -508,6 +508,145 @@ export default function Home() {
     }
   };
 
+  const [bulkDownloading, setBulkDownloading] = useState(false);
+
+  const downloadBulkQR = async () => {
+    const itemsToDownload = galleryData.filter(item => {
+      const matchFilter = galleryFilter === "all" || (galleryFilter === "vcard" && item.type === "vcard") || (galleryFilter === "smart" && item.type !== "vcard");
+      const name = item.type === "vcard" ? `${item.first_name || ""} ${item.last_name || ""}`.trim() : item.first_name || item.type || "";
+      const matchSearch = !gallerySearch || name.toLowerCase().includes(gallerySearch.toLowerCase());
+      return matchFilter && matchSearch;
+    });
+
+    if (itemsToDownload.length === 0) {
+      alert("Tidak ada QR Code untuk diunduh.");
+      return;
+    }
+
+    const confirmed = window.confirm(`Unduh ${itemsToDownload.length} QR Code dalam file ZIP?`);
+    if (!confirmed) return;
+
+    setBulkDownloading(true);
+    try {
+      const JSZip = (await import("jszip")).default;
+      const zip = new JSZip();
+      
+      let txtContent = "DAFTAR QR CODE & TAUTAN CHRONOLOGIE\n";
+      txtContent += "========================================\n\n";
+
+      for (let i = 0; i < itemsToDownload.length; i++) {
+        const item = itemsToDownload[i];
+        
+        let response;
+        if (item.type === "vcard") {
+          const vcardBody = {
+            previewOnly: true,
+            firstName: item.first_name,
+            lastName: item.last_name,
+            organization: item.organization,
+            title: item.position,
+            phone: item.phone,
+            email: item.email,
+            url: item.website,
+            dotsColor: item.dots_color,
+            dotsType: item.dots_type,
+            gradientColor2: item.gradient_color,
+            cornersSquareType: item.corners_square_type,
+            cornersSquareColor: item.corners_square_color,
+            cornersDotType: item.corners_dot_type,
+            cornersDotColor: item.corners_dot_color,
+            backgroundColor: item.background_color,
+            logoUrl: item.logo_url,
+            hideBackgroundDots: item.hide_background_dots
+          };
+          response = await fetch("/api/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-user-id": user?.id || "" },
+            body: JSON.stringify(vcardBody),
+          });
+        } else {
+          let finalData = "";
+          if (item.type === 'link') {
+            finalData = item.raw_data?.content || "";
+          } else if (item.type === 'wifi') {
+            finalData = `WIFI:S:${item.raw_data?.ssid};T:${item.raw_data?.encryption || "WPA"};P:${item.raw_data?.password};;`;
+          } else if (item.type === 'maps') {
+            finalData = `https://www.google.com/maps/search/?api=1&query=${item.raw_data?.lat},${item.raw_data?.lon}`;
+          } else if (item.type === 'whatsapp') {
+            const cleanNumber = (item.raw_data?.waNumber || "").replace(/[^0-9+]/g, '');
+            finalData = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(item.raw_data?.waMessage || "")}`;
+          } else if (item.type === 'instagram') {
+            const cleanUsername = (item.raw_data?.igUsername || "").replace('@', '').trim();
+            finalData = `https://instagram.com/${cleanUsername}`;
+          } else if (item.type === 'tiktok') {
+            const cleanUsername = (item.raw_data?.ttUsername || "").replace('@', '').trim();
+            finalData = `https://tiktok.com/@${cleanUsername}`;
+          }
+          
+          const smartBody = {
+            data: finalData,
+            type: item.type,
+            smartTitle: item.first_name,
+            rawData: item.raw_data,
+            previewOnly: true,
+            dotsColor: item.dots_color,
+            dotsType: item.dots_type,
+            gradientColor2: item.gradient_color,
+            cornersSquareType: item.corners_square_type,
+            cornersSquareColor: item.corners_square_color,
+            cornersDotType: item.corners_dot_type,
+            cornersDotColor: item.corners_dot_color,
+            backgroundColor: item.background_color,
+            logoUrl: item.logo_url,
+            hideBackgroundDots: item.hide_background_dots
+          };
+          
+          response = await fetch("/api/generate-basic", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-user-id": user?.id || "" },
+            body: JSON.stringify(smartBody),
+          });
+        }
+
+        if (!response.ok) {
+          console.warn(`Gagal generate QR untuk ${item.first_name}`);
+          continue;
+        }
+
+        const blob = await response.blob();
+        const finalUrl = await applyLogoToBlob(blob, item.logo_url, item.background_color, 'none');
+        const base64Data = finalUrl.split(',')[1];
+        
+        const name = item.type === "vcard" 
+          ? `${item.first_name || ""} ${item.last_name || ""}`.trim() || "vCard"
+          : item.first_name || item.type || "QR";
+        
+        const cleanName = name.replace(/[\/\\?%*:|"<>]/g, '-');
+        zip.file(`${cleanName}.png`, base64Data, { base64: true });
+
+        const shortUrl = typeof window !== "undefined" ? `${window.location.origin}/v/${item.short_id}` : `/v/${item.short_id}`;
+        txtContent += `Judul: ${name}\n`;
+        txtContent += `Short Link (Versi QR): ${shortUrl}\n`;
+        txtContent += `Tautan Asli: ${item.raw_data?.content || "-"}\n`;
+        txtContent += `----------------------------------------\n\n`;
+      }
+
+      zip.file("daftar_tautan.txt", txtContent);
+
+      const content = await zip.generateAsync({ type: "blob" });
+      const downloadLink = document.createElement("a");
+      downloadLink.href = URL.createObjectURL(content);
+      downloadLink.download = `BikinQR_Bulk_${new Date().toISOString().slice(0,10)}.zip`;
+      downloadLink.click();
+      
+      triggerConfetti();
+    } catch (error: any) {
+      alert("Gagal mengunduh bulk QR: " + error.message);
+    } finally {
+      setBulkDownloading(false);
+    }
+  };
+
   const deleteAllQRs = async () => {
     if (galleryData.length === 0) return;
     if (!window.confirm("⚠️ BAHAYA! Anda akan menghapus SELURUH gallery. Yakin?")) return;
@@ -1037,11 +1176,23 @@ export default function Home() {
                     <h3 className="text-2xl font-black uppercase italic flex items-center gap-3"><History /> My Gallery</h3>
                     <p className="text-xs font-bold text-gray-400 uppercase mt-1">{galleryData.length} QR Tersimpan</p>
                   </div>
-                  {galleryData.length > 0 && (
-                    <button type="button" onClick={deleteAllQRs} className="bg-red-500 text-white border-[3px] border-black px-5 py-2.5 rounded-2xl font-black uppercase text-sm shadow-[4px_4px_0px_0px_#000] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all flex items-center gap-2">
-                      <Trash2 size={16} /> Hapus Semua
-                    </button>
-                  )}
+                  <div className="flex items-center gap-3">
+                    {galleryData.length > 0 && (
+                      <button 
+                        type="button" 
+                        disabled={bulkDownloading}
+                        onClick={downloadBulkQR} 
+                        className="bg-[#2196f3] text-white border-[3px] border-black px-5 py-2.5 rounded-2xl font-black uppercase text-sm shadow-[4px_4px_0px_0px_#000] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all flex items-center gap-2 disabled:opacity-50"
+                      >
+                        <Download size={16} /> {bulkDownloading ? "Menyiapkan..." : "Unduh Bulk (ZIP)"}
+                      </button>
+                    )}
+                    {galleryData.length > 0 && (
+                      <button type="button" onClick={deleteAllQRs} className="bg-red-500 text-white border-[3px] border-black px-5 py-2.5 rounded-2xl font-black uppercase text-sm shadow-[4px_4px_0px_0px_#000] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all flex items-center gap-2">
+                        <Trash2 size={16} /> Hapus Semua
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {/* Search + Filter */}
                 <div className="flex flex-col md:flex-row gap-3">

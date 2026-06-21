@@ -316,19 +316,41 @@ export default function Home() {
     style: "none" as "none" | "rounded" | "badge" | "banner" | "circle" | "luxury",
     label: "SCAN ME",
     frameColor: "#000000",
-    labelColor: "#ffffff",
+          labelColor: "#ffffff",
     customLabel: ""
   });
 
   const defaultLogos = [
-    { name: 'Facebook', url: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/facebook.svg' },
-    { name: 'X', url: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/x.svg' },
-    { name: 'WhatsApp', url: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/whatsapp.svg' },
-    { name: 'Instagram', url: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/instagram.svg' },
-    { name: 'LinkedIn', url: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/linkedin.svg' },
-    { name: 'YouTube', url: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/youtube.svg' },
-    { name: 'Google', url: 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/google.svg' },
-    { name: 'Chronologie', url: '/logo-chronologie.png' },
+    { name: 'Facebook', url: 'https://cdn.simpleicons.org/facebook/1877F2' },
+    { name: 'Twitter', url: 'https://cdn.simpleicons.org/twitter/1DA1F2' },
+    { name: 'WhatsApp', url: 'https://cdn.simpleicons.org/whatsapp/25D366' },
+    { name: 'Instagram', url: 'https://cdn.simpleicons.org/instagram/E4405F' },
+    { name: 'LinkedIn', url: 'https://cdn.simpleicons.org/linkedin/0A66C2' },
+    { name: 'YouTube', url: 'https://cdn.simpleicons.org/youtube/FF0000' },
+    { name: 'Google', url: 'https://cdn.simpleicons.org/google/4285F4' },
+    { name: 'Bvlgari', url: 'http://localhost:3001/uploads/bvlgari.png' },
+    { name: 'Omega', url: 'http://localhost:3001/uploads/omega.png' },
+    { name: 'Cartier', url: 'http://localhost:3001/uploads/cartier.png' },
+  ];
+
+  const presetLinks = [
+    { brand: "EDOX", title: "Mode emploi EDOX EN web (Bahasa)", url: "https://chronologie-manual-book.vercel.app/download/mode-emploi-edox-en-web-bahasa" },
+    { brand: "HAMILTON", title: "Hamilton 1000 ID Garansi Internasional", url: "https://chronologie-manual-book.vercel.app/download/1000-id-garansi-internasional" },
+    { brand: "HAMILTON", title: "Hamilton 1001 ID Manual Winding Bahasa", url: "https://chronologie-manual-book.vercel.app/download/1001-id-manual-winding-bahasa" },
+    { brand: "HAMILTON", title: "Hamilton 1002 ID Jam Tangan Quartz", url: "https://chronologie-manual-book.vercel.app/download/1002-id-jam-tangan-quartz" },
+    { brand: "HAMILTON", title: "Hamilton 1003 ID Kronograf", url: "https://chronologie-manual-book.vercel.app/download/1003-id-kronograf-dengan-pemutaran-otomatis-atau-manual" },
+    { brand: "HAMILTON", title: "Hamilton 1004 ID Kronograf Quartz", url: "https://chronologie-manual-book.vercel.app/download/1004-idkronograf-quartz" },
+    { brand: "HAMILTON", title: "Hamilton 1007 ID Khaki Navy Scuba GMT", url: "https://chronologie-manual-book.vercel.app/download/1007-idkhaki-navy-scuba-gmt" },
+    { brand: "HAMILTON", title: "Hamilton 1008 ID PSR", url: "https://chronologie-manual-book.vercel.app/download/1008-id-psr" },
+    { brand: "HAMILTON", title: "Hamilton 1011 ID Jazzmaster Face 2 Face III", url: "https://chronologie-manual-book.vercel.app/download/1011-idjazzmaster-face-2-face-iii" },
+    { brand: "HAMILTON", title: "Hamilton 1012 ID Ventura Edge Dune", url: "https://chronologie-manual-book.vercel.app/download/1012-idventura-edge-dune" },
+    { brand: "HAMILTON", title: "Hamilton 1016 ID PSR 74", url: "https://chronologie-manual-book.vercel.app/download/1016-idpsr-74" },
+    { brand: "YEMA", title: "Yema CMM.10 Caliber", url: "https://chronologie-manual-book.vercel.app/download/sistem-opersional-cmm-10-caliber" },
+    { brand: "YEMA", title: "Yema CMM.20 Caliber", url: "https://chronologie-manual-book.vercel.app/download/sistem-opersional-cmm-20-caliber" },
+    { brand: "YEMA", title: "Yema CMM.30 Caliber", url: "https://chronologie-manual-book.vercel.app/download/sistem-opersional-cmm-30-caliber" },
+    { brand: "YEMA", title: "Yema SW200-1 Caliber", url: "https://chronologie-manual-book.vercel.app/download/sistem-opersional-sw200-1-caliber" },
+    { brand: "YEMA", title: "Yema VH.31 Caliber", url: "https://chronologie-manual-book.vercel.app/download/sistem-opersional-vh-31-caliber" },
+    { brand: "YEMA", title: "Yema VK-64 & VK-61 Caliber", url: "https://chronologie-manual-book.vercel.app/download/sistem-opersional-vk-64-vk-61-caliber" },
   ];
 
   const [activeTab, setActiveTab] = useState<"qr" | "vcard" | "smart" | "analytics" | "gallery">("qr");
@@ -894,6 +916,33 @@ export default function Home() {
                 <section className="bg-white border-[4px] border-black shadow-[10px_10px_0px_0px_#000] rounded-[2.5rem] p-10">
                   <div className="flex items-center gap-4 mb-10"><div className="w-12 h-12 bg-[#2196f3] border-[3px] border-black rounded-2xl flex items-center justify-center text-white"><User size={24} /></div><h2 className="text-3xl font-[900] uppercase text-black italic">Data Personal</h2></div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="md:col-span-2 space-y-3 bg-[#fffbef] border-[4px] border-black p-6 rounded-[2rem] shadow-inner mb-2">
+                      <label className="text-sm font-[900] uppercase ml-1 flex items-center gap-2">
+                        Galeri Link Manual Book <Sparkles size={16} className="text-pink-500" />
+                      </label>
+                      <p className="text-xs font-bold text-gray-500 mb-3 ml-1">Pilih manual untuk auto-fill Website, Jabatan, dan Organisasi!</p>
+                      <select 
+                        onChange={(e) => {
+                          if(!e.target.value) return;
+                          const preset = presetLinks.find(p => p.url === e.target.value);
+                          if(preset) {
+                            setFormData({...formData, url: preset.url, title: preset.title, organization: preset.brand});
+                          }
+                        }}
+                        className="w-full bg-white border-[3px] border-black rounded-2xl px-6 py-4 font-bold shadow-[6px_6px_0px_0px_#000] focus:translate-x-[3px] focus:translate-y-[3px] focus:shadow-none transition-all outline-none appearance-none cursor-pointer"
+                      >
+                        <option value="">-- Pilih Manual Book --</option>
+                        <optgroup label="EDOX">
+                          {presetLinks.filter(p => p.brand === "EDOX").map(p => <option key={p.url} value={p.url}>{p.title}</option>)}
+                        </optgroup>
+                        <optgroup label="HAMILTON">
+                          {presetLinks.filter(p => p.brand === "HAMILTON").map(p => <option key={p.url} value={p.url}>{p.title}</option>)}
+                        </optgroup>
+                        <optgroup label="YEMA">
+                          {presetLinks.filter(p => p.brand === "YEMA").map(p => <option key={p.url} value={p.url}>{p.title}</option>)}
+                        </optgroup>
+                      </select>
+                    </div>
                     <CartoonInput id="firstName" label="Nama Depan" name="firstName" value={formData.firstName} onChange={handleInputChange} icon={<Star size={20} className="text-pink-500" />} />
                     <CartoonInput id="lastName" label="Nama Belakang" name="lastName" value={formData.lastName} onChange={handleInputChange} icon={<Star size={20} className="text-yellow-500" />} />
                     <CartoonInput id="organization" label="Organisasi" name="organization" value={formData.organization} onChange={handleInputChange} icon={<Briefcase size={20} className="text-blue-500" />} />

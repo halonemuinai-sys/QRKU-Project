@@ -351,6 +351,15 @@ export default function Home() {
     { brand: "YEMA", title: "Yema SW200-1 Caliber", url: "https://chronologie-manual-book.vercel.app/download/sistem-opersional-sw200-1-caliber" },
     { brand: "YEMA", title: "Yema VH.31 Caliber", url: "https://chronologie-manual-book.vercel.app/download/sistem-opersional-vh-31-caliber" },
     { brand: "YEMA", title: "Yema VK-64 & VK-61 Caliber", url: "https://chronologie-manual-book.vercel.app/download/sistem-opersional-vk-64-vk-61-caliber" },
+    { brand: "MAEN", title: "Maen Brooklyn 36", url: "https://chronologie-manual-book.vercel.app/download/maen-brooklyn-36" },
+    { brand: "MAEN", title: "Maen Hudson 38 GMT", url: "https://chronologie-manual-book.vercel.app/download/maen-hudson-38-gmt" },
+    { brand: "MAEN", title: "Maen Hudson 38 MK4", url: "https://chronologie-manual-book.vercel.app/download/maen-hudson-38-mk4" },
+    { brand: "MAEN", title: "Maen Hudson MK4", url: "https://chronologie-manual-book.vercel.app/download/maen-hudson-mk4" },
+    { brand: "MAEN", title: "Maen Lunnar Classic", url: "https://chronologie-manual-book.vercel.app/download/maen-lunnar-classic" },
+    { brand: "MAEN", title: "Maen Manhattan 37 Ultra Thin", url: "https://chronologie-manual-book.vercel.app/download/maen-manhattan-37-ultra-thin" },
+    { brand: "MAEN", title: "Maen Manhattan 37", url: "https://chronologie-manual-book.vercel.app/download/maen-manhattan-37" },
+    { brand: "MAEN", title: "Maen Manhattan Sky Master 38", url: "https://chronologie-manual-book.vercel.app/download/maen-manhattan-sky-master-38" },
+    { brand: "FREDERIQUE CONSTANT", title: "Frederique Constant Petunjuk Penggunaan", url: "https://chronologie-manual-book.vercel.app/download/frederique-constant-petunjuk-penggunaan" }
   ];
 
   const [activeTab, setActiveTab] = useState<"qr" | "vcard" | "smart" | "analytics" | "gallery">("qr");
@@ -940,6 +949,12 @@ export default function Home() {
                         </optgroup>
                         <optgroup label="YEMA">
                           {presetLinks.filter(p => p.brand === "YEMA").map(p => <option key={p.url} value={p.url}>{p.title}</option>)}
+                        </optgroup>
+                        <optgroup label="MAEN">
+                          {presetLinks.filter(p => p.brand === "MAEN").map(p => <option key={p.url} value={p.url}>{p.title}</option>)}
+                        </optgroup>
+                        <optgroup label="FREDERIQUE CONSTANT">
+                          {presetLinks.filter(p => p.brand === "FREDERIQUE CONSTANT").map(p => <option key={p.url} value={p.url}>{p.title}</option>)}
                         </optgroup>
                       </select>
                     </div>

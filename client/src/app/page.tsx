@@ -362,7 +362,24 @@ export default function Home() {
     { brand: "MAEN", title: "Maen Manhattan 37 Ultra Thin", url: "https://chronologie-manual-book.vercel.app/download/maen-manhattan-37-ultra-thin" },
     { brand: "MAEN", title: "Maen Manhattan 37", url: "https://chronologie-manual-book.vercel.app/download/maen-manhattan-37" },
     { brand: "MAEN", title: "Maen Manhattan Sky Master 38", url: "https://chronologie-manual-book.vercel.app/download/maen-manhattan-sky-master-38" },
-    { brand: "FREDERIQUE CONSTANT", title: "Frederique Constant Petunjuk Penggunaan", url: "https://chronologie-manual-book.vercel.app/download/frederique-constant-petunjuk-penggunaan" }
+    { brand: "FREDERIQUE CONSTANT", title: "Frederique Constant Petunjuk Penggunaan", url: "https://chronologie-manual-book.vercel.app/download/frederique-constant-petunjuk-penggunaan" },
+    { brand: "CALI", title: "Cali 2761 GMT", url: "https://chronologie-manual-book.vercel.app/download/cali-2761-gmt" },
+    { brand: "CALI", title: "Cali 2765 GMT Worldtimer", url: "https://chronologie-manual-book.vercel.app/download/cali-2765-gmt-worldtimer" },
+    { brand: "CALI", title: "Cali 2766-2", url: "https://chronologie-manual-book.vercel.app/download/cali-2766-2" },
+    { brand: "CALI", title: "Cali 2880", url: "https://chronologie-manual-book.vercel.app/download/cali-2880" },
+    { brand: "CALI", title: "Cali 2945-2145 Moonphase", url: "https://chronologie-manual-book.vercel.app/download/cali-2945-2145-moonphase" },
+    { brand: "CALI", title: "Cali 7741 Chrono", url: "https://chronologie-manual-book.vercel.app/download/cali-7741-chrono" },
+    { brand: "CALI", title: "Cali 7754", url: "https://chronologie-manual-book.vercel.app/download/cali-7754" },
+    { brand: "CALI", title: "Cali 7780 Chrono", url: "https://chronologie-manual-book.vercel.app/download/cali-7780-chrono" },
+    { brand: "CALI", title: "Cali 7783 Flyback", url: "https://chronologie-manual-book.vercel.app/download/cali-7783-flyback" },
+    { brand: "CALI", title: "Cali Mech Auto with Date Hand and Moonphase", url: "https://chronologie-manual-book.vercel.app/download/cali-mech-auto-with-date-hand-and-moonphase" },
+    { brand: "CALI", title: "Cali Mech Auto with Date", url: "https://chronologie-manual-book.vercel.app/download/cali-mech-auto-with-date" },
+    { brand: "CALI", title: "Cali Mech Auto with DayDateWeekMonth Moonphase", url: "https://chronologie-manual-book.vercel.app/download/cali-mech-auto-with-daydateweekmonth-moonphase" },
+    { brand: "CALI", title: "Cali Mech Auto with Moonphase Date", url: "https://chronologie-manual-book.vercel.app/download/cali-mech-auto-with-moonphase-date" },
+    { brand: "CALI", title: "Cali Mech Automatic", url: "https://chronologie-manual-book.vercel.app/download/cali-mech-automatic" },
+    { brand: "CALI", title: "Cali Mech Small Seconds", url: "https://chronologie-manual-book.vercel.app/download/cali-mech-small-seconds" },
+    { brand: "CALI", title: "Cali Quartz 2", url: "https://chronologie-manual-book.vercel.app/download/cali-quartz-2" },
+    { brand: "CALI", title: "Cali Quartz Shine", url: "https://chronologie-manual-book.vercel.app/download/cali-quartz-shine" }
   ];
 
   const [activeTab, setActiveTab] = useState<"qr" | "vcard" | "smart" | "analytics" | "gallery">("qr");
@@ -958,6 +975,9 @@ export default function Home() {
                         </optgroup>
                         <optgroup label="FREDERIQUE CONSTANT">
                           {presetLinks.filter(p => p.brand === "FREDERIQUE CONSTANT").map(p => <option key={p.url} value={p.url}>{p.title}</option>)}
+                        </optgroup>
+                        <optgroup label="CALI">
+                          {presetLinks.filter(p => p.brand === "CALI").map(p => <option key={p.url} value={p.url}>{p.title}</option>)}
                         </optgroup>
                       </select>
                     </div>

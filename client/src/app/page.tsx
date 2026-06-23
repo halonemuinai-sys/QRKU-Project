@@ -155,17 +155,18 @@ const processLogoForLuxury = (logo: HTMLImageElement): HTMLCanvasElement => {
 
 const applyLogoToBlob = (blob: Blob, logoUrl: string, bgColor: string = '#ffffff', frameStyle: string = 'none'): Promise<string> => {
   return new Promise((resolve) => {
-    const rawUrl = URL.createObjectURL(blob);
-    if (!logoUrl) return resolve(rawUrl);
-    
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    const img = new Image();
-    
-    // Only set crossOrigin if logoUrl is a remote URL and not same-origin
-    if (rawUrl.startsWith('http') && !rawUrl.startsWith('blob:') && !rawUrl.startsWith(window.location.origin)) {
-      img.crossOrigin = "anonymous";
-    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const rawUrl = reader.result as string;
+      if (!logoUrl) return resolve(rawUrl);
+      
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      const img = new Image();
+      
+      if (rawUrl.startsWith('http') && !rawUrl.startsWith('data:') && !rawUrl.startsWith(window.location.origin)) {
+        img.crossOrigin = "anonymous";
+      }
     
     img.onload = () => {
       canvas.width = img.width;
@@ -245,6 +246,8 @@ const applyLogoToBlob = (blob: Blob, logoUrl: string, bgColor: string = '#ffffff
       resolve(rawUrl);
     };
     img.src = rawUrl;
+  };
+  reader.readAsDataURL(blob);
   });
 };
 
@@ -553,7 +556,7 @@ export default function Home() {
           hideBackgroundDots: item.hide_background_dots
         };
         
-        const response = await fetch("/api/generate-basic", {
+        const response = await fetch("/api/generate-buffer", {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-user-id": user?.id || "" },
           body: JSON.stringify(smartBody),

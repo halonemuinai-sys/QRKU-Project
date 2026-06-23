@@ -124,6 +124,21 @@ app.post('/generate', async (req, res) => {
     }
 });
 
+/**
+ * @api {post} /generate-buffer Generate QR Buffer without DB insert
+ */
+app.post('/generate-buffer', async (req, res) => {
+    try {
+        const { data: dynamicUrl } = req.body;
+        const buffer = await generateQrBuffer(dynamicUrl, req.body);
+        res.type('png');
+        res.send(buffer);
+    } catch (error) {
+        console.error('Error in /generate-buffer:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.post('/generate-basic', async (req, res) => {
     try {
         const { 

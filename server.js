@@ -68,45 +68,78 @@ app.post('/generate', async (req, res) => {
         const { 
             firstName, lastName, organization, phone, email, title, url,
             dotsColor, dotsType, gradientColor2, cornersSquareType, cornersSquareColor,
-            cornersDotType, cornersDotColor, backgroundColor, logoUrl, hideBackgroundDots
+            cornersDotType, cornersDotColor, backgroundColor, logoUrl, hideBackgroundDots,
+            editingId
         } = req.body;
 
-        const shortId = nanoid(6);
-
-        console.log("Generating vCard QR for:", firstName, lastName);
-        
         const userId = req.headers['x-user-id'];
+        let shortId;
 
-        const { data, error } = await supabase
-            .from('dynamic_links')
-            .insert([{
-                short_id: shortId,
-                type: 'vcard',
-                user_id: userId || null,
-                first_name: firstName,
-                last_name: lastName,
-                organization: organization,
-                position: title,
-                phone: phone,
-                email: email,
-                website: url,
-                dots_color: dotsColor,
-                gradient_color: gradientColor2,
-                dots_type: dotsType,
-                corners_square_type: cornersSquareType,
-                corners_square_color: cornersSquareColor,
-                corners_dot_type: cornersDotType,
-                corners_dot_color: cornersDotColor,
-                background_color: backgroundColor,
-                logo_url: logoUrl,
-                hide_background_dots: hideBackgroundDots
-            }])
-            .select()
-            .single();
+        if (editingId) {
+            console.log("Updating vCard QR for editingId:", editingId);
+            const { data: existing, error: fetchErr } = await supabase.from('dynamic_links').select('short_id').eq('id', editingId).single();
+            if (fetchErr) throw fetchErr;
+            shortId = existing.short_id;
 
-        if (error) {
-            console.error("Supabase Insert Error:", error);
-            throw error;
+            const { error } = await supabase
+                .from('dynamic_links')
+                .update({
+                    first_name: firstName,
+                    last_name: lastName,
+                    organization: organization,
+                    position: title,
+                    phone: phone,
+                    email: email,
+                    website: url,
+                    dots_color: dotsColor,
+                    gradient_color: gradientColor2,
+                    dots_type: dotsType,
+                    corners_square_type: cornersSquareType,
+                    corners_square_color: cornersSquareColor,
+                    corners_dot_type: cornersDotType,
+                    corners_dot_color: cornersDotColor,
+                    background_color: backgroundColor,
+                    logo_url: logoUrl,
+                    hide_background_dots: hideBackgroundDots
+                })
+                .eq('id', editingId);
+            
+            if (error) {
+                console.error("Supabase Update Error:", error);
+                throw error;
+            }
+        } else {
+            shortId = nanoid(6);
+            console.log("Generating vCard QR for:", firstName, lastName);
+            const { error } = await supabase
+                .from('dynamic_links')
+                .insert([{
+                    short_id: shortId,
+                    type: 'vcard',
+                    user_id: userId || null,
+                    first_name: firstName,
+                    last_name: lastName,
+                    organization: organization,
+                    position: title,
+                    phone: phone,
+                    email: email,
+                    website: url,
+                    dots_color: dotsColor,
+                    gradient_color: gradientColor2,
+                    dots_type: dotsType,
+                    corners_square_type: cornersSquareType,
+                    corners_square_color: cornersSquareColor,
+                    corners_dot_type: cornersDotType,
+                    corners_dot_color: cornersDotColor,
+                    background_color: backgroundColor,
+                    logo_url: logoUrl,
+                    hide_background_dots: hideBackgroundDots
+                }]);
+            
+            if (error) {
+                console.error("Supabase Insert Error:", error);
+                throw error;
+            }
         }
 
         console.log("Record saved. Generating buffer...");
@@ -144,34 +177,62 @@ app.post('/generate-basic', async (req, res) => {
         const { 
             data: qrData, type = 'link', rawData,
             dotsColor, dotsType, gradientColor2, cornersSquareType, cornersSquareColor,
-            cornersDotType, cornersDotColor, backgroundColor, logoUrl, hideBackgroundDots
+            cornersDotType, cornersDotColor, backgroundColor, logoUrl, hideBackgroundDots,
+            editingId, smartTitle
         } = req.body;
 
-        const shortId = nanoid(6);
-
         const userId = req.headers['x-user-id'];
+        let shortId;
 
-        // Save to DB for Gallery
-        const { error } = await supabase
-            .from('dynamic_links')
-            .insert([{
-                short_id: shortId,
-                type: type,
-                user_id: userId || null,
-                raw_data: rawData || { content: qrData },
-                dots_color: dotsColor,
-                gradient_color: gradientColor2,
-                dots_type: dotsType,
-                corners_square_type: cornersSquareType,
-                corners_square_color: cornersSquareColor,
-                corners_dot_type: cornersDotType,
-                corners_dot_color: cornersDotColor,
-                background_color: backgroundColor,
-                logo_url: logoUrl,
-                hide_background_dots: hideBackgroundDots
-            }]);
+        if (editingId) {
+            console.log("Updating Basic QR for editingId:", editingId);
+            const { data: existing, error: fetchErr } = await supabase.from('dynamic_links').select('short_id').eq('id', editingId).single();
+            if (fetchErr) throw fetchErr;
+            shortId = existing.short_id;
 
-        if (error) throw error;
+            const { error } = await supabase
+                .from('dynamic_links')
+                .update({
+                    type: type,
+                    raw_data: rawData || { content: qrData },
+                    first_name: smartTitle || '',
+                    dots_color: dotsColor,
+                    gradient_color: gradientColor2,
+                    dots_type: dotsType,
+                    corners_square_type: cornersSquareType,
+                    corners_square_color: cornersSquareColor,
+                    corners_dot_type: cornersDotType,
+                    corners_dot_color: cornersDotColor,
+                    background_color: backgroundColor,
+                    logo_url: logoUrl,
+                    hide_background_dots: hideBackgroundDots
+                })
+                .eq('id', editingId);
+            if (error) throw error;
+        } else {
+            shortId = nanoid(6);
+            // Save to DB for Gallery
+            const { error } = await supabase
+                .from('dynamic_links')
+                .insert([{
+                    short_id: shortId,
+                    type: type,
+                    user_id: userId || null,
+                    first_name: smartTitle || '',
+                    raw_data: rawData || { content: qrData },
+                    dots_color: dotsColor,
+                    gradient_color: gradientColor2,
+                    dots_type: dotsType,
+                    corners_square_type: cornersSquareType,
+                    corners_square_color: cornersSquareColor,
+                    corners_dot_type: cornersDotType,
+                    corners_dot_color: cornersDotColor,
+                    background_color: backgroundColor,
+                    logo_url: logoUrl,
+                    hide_background_dots: hideBackgroundDots
+                }]);
+            if (error) throw error;
+        }
 
         // Dynamic link for tracking
         const dynamicUrl = `http://localhost:3001/v/${shortId}`;

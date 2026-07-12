@@ -634,6 +634,10 @@ export default function Home() {
 
   const restoreQR = (item: any) => {
     setEditingId(item.id);
+    setQrImage(null);
+    setSmartQrImage(null);
+    setQrSaved(false);
+    setSmartQrSaved(false);
     if (item.type === 'vcard') {
       setFormData({
         firstName: item.first_name,

@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       }
 
       const buffer = await QRCode.toBuffer(previewData, {
-        width: 1000, margin: 2,
+        width: 2048, margin: 2,
         color: { dark: dotsColor || '#000000', light: backgroundColor || '#ffffff' },
         errorCorrectionLevel: 'H'
       });
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
 
     const dynamicUrl = `${req.nextUrl.origin}/v/${shortId}`;
     const buffer = await QRCode.toBuffer(dynamicUrl, {
-      width: 1000,
+      width: 2048,
       margin: 2,
       color: { dark: dotsColor || '#000000', light: backgroundColor || '#ffffff' },
       errorCorrectionLevel: 'H'

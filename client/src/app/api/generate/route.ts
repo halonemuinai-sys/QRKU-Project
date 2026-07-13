@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     const userId = req.headers.get('x-user-id');
 
     if (previewOnly) {
-      const vcardString = [
+      let previewData = [
         'BEGIN:VCARD', 'VERSION:3.0',
         `FN:${firstName || ''} ${lastName || ''}`.trim(),
         organization ? `ORG:${organization}` : '',
@@ -31,7 +31,15 @@ export async function POST(req: NextRequest) {
         url ? `URL:${url}` : '',
         'END:VCARD'
       ].filter(Boolean).join('\n');
-      const buffer = await QRCode.toBuffer(vcardString, {
+
+      if (editingId) {
+        const { data: existing } = await supabaseServer.from('dynamic_links').select('short_id').eq('id', editingId).single();
+        if (existing?.short_id) {
+          previewData = `${req.nextUrl.origin}/v/${existing.short_id}`;
+        }
+      }
+
+      const buffer = await QRCode.toBuffer(previewData, {
         width: 1000, margin: 2,
         color: { dark: dotsColor || '#000000', light: backgroundColor || '#ffffff' },
         errorCorrectionLevel: 'H'
@@ -63,9 +71,9 @@ export async function POST(req: NextRequest) {
       hide_background_dots: hideBackgroundDots
     };
 
-    if (editingId && userId) {
+    if (editingId) {
       const { data: existing } = await supabaseServer.from('dynamic_links').select('short_id, user_id').eq('id', editingId).single();
-      if (existing && existing.user_id === userId) {
+      if (existing && (!existing.user_id || !userId || existing.user_id === userId)) {
         shortId = existing.short_id;
         const { error } = await supabaseServer.from('dynamic_links').update(payload).eq('id', editingId);
         if (error) throw error;

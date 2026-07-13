@@ -709,7 +709,7 @@ export default function Home() {
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-user-id": user?.id || "" },
-        body: JSON.stringify({ ...formData, previewOnly: true }),
+        body: JSON.stringify({ ...formData, previewOnly: true, editingId }),
       });
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
@@ -784,7 +784,7 @@ export default function Home() {
       const response = await fetch("/api/generate-basic", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-user-id": user?.id || "" },
-        body: JSON.stringify({ data: finalData, type: smartData.type, smartTitle: smartData.title, rawData, previewOnly: true, ...formData }),
+        body: JSON.stringify({ data: finalData, type: smartData.type, smartTitle: smartData.title, rawData, previewOnly: true, editingId, ...formData }),
       });
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
